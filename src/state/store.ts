@@ -45,7 +45,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'END_TURN':
       return startTurn(endTurn(state));
     case 'PLACE_CARD_FACE_DOWN': {
-      const placed = placeCardFaceDown(state, action.playerId, action.cardInstanceId);
+      const placed = placeCardFaceDown(state, action.playerId, action.cardInstanceId, action.targetSlot);
       if (isReadyToReveal(placed)) {
         return revealOpeningBoards(placed);
       }
@@ -75,7 +75,8 @@ function buildDeckInstances(deckConfig: DeckConfig, ownerId: string): CardInstan
       keywords: def.keywords,
       hasAttackedThisTurn: false,
       hasMovedThisTurn: false,
-    };
+      cost: def.cost,
+    } as CardInstance & { cost: number };
   });
 }
 
@@ -93,7 +94,8 @@ function buildCompanionInstance(deckConfig: DeckConfig, ownerId: string): Compan
     evolutionStage: 1,
     charge: 0,
     evolutionDefinitionId: def.evolutionTarget ?? '',
-  };
+    cost: 0,
+  } as CompanionInstance & { cost: number };
 }
 
 const base = createInitialGameState('player-1', 'player-2');

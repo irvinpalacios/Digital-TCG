@@ -27,6 +27,7 @@ export function HUD({ player, isActive }: HUDProps) {
       <span>{player.playerId}</span>
       <span>Energy: {player.energy}/{player.energyMax}</span>
       <span>Actions: {player.actionsRemaining}</span>
+      <span>Deck: {player.deck.length}</span>
       <span>{companionName} — HP: {player.companion.currentHp} | Charge: {player.companion.charge}</span>
     </div>
   );

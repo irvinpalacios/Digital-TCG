@@ -7,12 +7,13 @@ export function OpeningScreen() {
   const { state, dispatch } = useGameState();
   const [draggedCardId, setDraggedCardId] = React.useState<string | null>(null);
   const [confirmed, setConfirmed] = React.useState(false);
+  const [dragTargetSlot, setDragTargetSlot] = React.useState<{row: 'front'|'back', index: 0|1|2} | null>(null);
 
   const p1 = state.players.find((p) => p.playerId === 'player-1')!;
   const p2 = state.players.find((p) => p.playerId === 'player-2')!;
 
-  const p1Placed = (p1.openingPlacements ?? []).length;
-  const p2Placed = (p2.openingPlacements ?? []).length;
+  const p1Placed = (p1.openingPlacements ?? []).filter((fc) => fc !== null).length;
+  const p2Placed = (p2.openingPlacements ?? []).filter((fc) => fc !== null).length;
 
   // Active placer: p1 goes first, then p2 once p1 is done
   const activePlacer = p1Placed < 6 ? 'player-1' : 'player-2';
@@ -59,14 +60,15 @@ export function OpeningScreen() {
               <span style={{ width: '40px', color: '#666', lineHeight: '56px', textAlign: 'right', marginRight: '4px' }}>{row}</span>
               {([0, 1, 2] as const).map((idx) => {
                 const slotNum = row === 'front' ? idx : idx + 3;
-                const filled = activePlaced > slotNum;
+                const placements = activePlayer.openingPlacements ?? [];
+                const filled = placements[slotNum] != null;
                 return (
                   <div
                     key={idx}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => {
                       if (draggedCardId) {
-                        dispatch({ type: 'PLACE_CARD_FACE_DOWN', cardInstanceId: draggedCardId, playerId: activePlacer });
+                        dispatch({ type: 'PLACE_CARD_FACE_DOWN', cardInstanceId: draggedCardId, playerId: activePlacer, targetSlot: { row, index: idx } });
                         setDraggedCardId(null);
                       }
                     }}
@@ -140,7 +142,7 @@ export function OpeningScreen() {
           <div style={{ display: 'flex', gap: '40px', justifyContent: 'center', marginBottom: '16px' }}>
             <div style={{ textAlign: 'left' }}>
               <div style={{ color: '#aaa', marginBottom: '4px' }}>Player 1:</div>
-              {(p1.openingPlacements ?? []).map((fc) => (
+              {(p1.openingPlacements ?? []).filter((fc): fc is FaceDownCard => fc !== null).map((fc) => (
                 <div key={fc.instanceId} style={{ color: '#ccc', fontSize: '12px' }}>
                   {getCardDefinition(fc.definitionId)?.name ?? fc.definitionId}
                 </div>
@@ -148,7 +150,7 @@ export function OpeningScreen() {
             </div>
             <div style={{ textAlign: 'left' }}>
               <div style={{ color: '#aaa', marginBottom: '4px' }}>Player 2:</div>
-              {(p2.openingPlacements ?? []).map((fc) => (
+              {(p2.openingPlacements ?? []).filter((fc): fc is FaceDownCard => fc !== null).map((fc) => (
                 <div key={fc.instanceId} style={{ color: '#ccc', fontSize: '12px' }}>
                   {getCardDefinition(fc.definitionId)?.name ?? fc.definitionId}
                 </div>

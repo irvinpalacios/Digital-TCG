@@ -8,6 +8,7 @@ import { EventLog } from './EventLog';
 import { getLegalTargets } from '../rules/targeting';
 import { getLegalPlaySlots } from '../rules/validation';
 import { getLegalMoves } from '../rules/movement';
+import { GAME_CONSTANTS } from '../../config/gameConstants';
 
 export function GameScreen() {
   const { state, dispatch } = useGameState();
@@ -101,6 +102,7 @@ export function GameScreen() {
         onSlotClick={handlePlayerSlotClick}
         flipped={false}
       />
+      <div style={{ fontSize: 12, color: '#666' }}>Hand ({player.hand.length}/{GAME_CONSTANTS.HAND_SIZE_CAP})</div>
       <Hand hand={player.hand} selectedCardId={selectedCardId} onCardClick={handleCardClick} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <HUD player={player} isActive={isActivePlayer} />

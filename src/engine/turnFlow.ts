@@ -8,13 +8,27 @@ export function startTurn(state: GameState): GameState {
       player.energyMax + GAME_CONSTANTS.ENERGY_GROWTH_PER_TURN,
       GAME_CONSTANTS.ENERGY_CAP,
     );
+    const drawCount = Math.min(
+      Math.max(0, GAME_CONSTANTS.HAND_SIZE_CAP - player.hand.length),
+      player.deck.length,
+    );
+    const drawn = player.deck.slice(0, drawCount);
+    const remainingDeck = player.deck.slice(drawCount);
     return {
       ...player,
       energyMax: newEnergyMax,
       energy: newEnergyMax,
       actionsRemaining: GAME_CONSTANTS.ACTIONS_PER_TURN,
+      hand: [...player.hand, ...drawn],
+      deck: remainingDeck,
     };
   }) as [PlayerState, PlayerState];
+
+  const active = state.players.find((p) => p.playerId === state.activePlayerId)!;
+  const drawCount = Math.min(
+    Math.max(0, GAME_CONSTANTS.HAND_SIZE_CAP - active.hand.length),
+    active.deck.length,
+  );
 
   return {
     ...state,
@@ -22,6 +36,7 @@ export function startTurn(state: GameState): GameState {
     eventLog: [
       ...state.eventLog,
       `Turn ${state.turnNumber} started for ${state.activePlayerId}`,
+      ...(drawCount > 0 ? [`${state.activePlayerId} drew ${drawCount} card${drawCount !== 1 ? 's' : ''}.`] : []),
     ],
   };
 }

@@ -5,6 +5,7 @@ export function placeCardFaceDown(
   state: GameState,
   playerId: string,
   cardInstanceId: string,
+  targetSlot: { row: 'front' | 'back'; index: 0 | 1 | 2 },
 ): GameState {
   if (state.phase !== 'opening') {
     return {
@@ -29,15 +30,20 @@ export function placeCardFaceDown(
     };
   }
 
-  const placements = player.openingPlacements ?? [];
-  if (placements.length >= 6) {
+  const slotNum = targetSlot.row === 'front' ? targetSlot.index : targetSlot.index + 3;
+  const placements: (FaceDownCard | null)[] = player.openingPlacements ?? Array(6).fill(null);
+
+  if (placements[slotNum] !== null) {
     return {
       ...state,
-      eventLog: [...state.eventLog, `Warning: ${playerId} has already placed 6 cards face-down.`],
+      eventLog: [...state.eventLog, `Warning: Slot already occupied.`],
     };
   }
 
   const faceDownCard: FaceDownCard = { instanceId: card.instanceId, definitionId: card.definitionId, ownerId: playerId, revealed: false };
+
+  const newPlacements = [...placements];
+  newPlacements[slotNum] = faceDownCard;
 
   const updatedPlayers = state.players.map((p) =>
     p.playerId !== playerId
@@ -45,19 +51,22 @@ export function placeCardFaceDown(
       : {
           ...p,
           hand: p.hand.filter((c) => c.instanceId !== cardInstanceId),
-          openingPlacements: [...placements, faceDownCard],
+          openingPlacements: newPlacements,
         },
   ) as [PlayerState, PlayerState];
 
   return {
     ...state,
     players: updatedPlayers,
-    eventLog: [...state.eventLog, `${playerId} placed a card face-down (${cardInstanceId}).`],
+    eventLog: [...state.eventLog, `${playerId} placed a card face-down at ${targetSlot.row}[${targetSlot.index}].`],
   };
 }
 
 export function isReadyToReveal(state: GameState): boolean {
-  return state.players.every((p) => (p.openingPlacements ?? []).length === 6);
+  return state.players.every((p) => {
+    const placements = p.openingPlacements ?? [];
+    return placements.length === 6 && placements.every((fc) => fc !== null);
+  });
 }
 
 export function revealOpeningBoards(state: GameState): GameState {
@@ -89,15 +98,15 @@ export function revealOpeningBoards(state: GameState): GameState {
     };
 
     const front: [Slot, Slot, Slot] = [
-      { position: { row: 'front', index: 0 }, occupant: makeInstance(placements[0]) },
-      { position: { row: 'front', index: 1 }, occupant: makeInstance(placements[1]) },
-      { position: { row: 'front', index: 2 }, occupant: makeInstance(placements[2]) },
+      { position: { row: 'front', index: 0 }, occupant: makeInstance(placements[0]!) },
+      { position: { row: 'front', index: 1 }, occupant: makeInstance(placements[1]!) },
+      { position: { row: 'front', index: 2 }, occupant: makeInstance(placements[2]!) },
     ];
 
     const back: [Slot, Slot, Slot] = [
-      { position: { row: 'back', index: 0 }, occupant: makeInstance(placements[3]) },
-      { position: { row: 'back', index: 1 }, occupant: makeInstance(placements[4]) },
-      { position: { row: 'back', index: 2 }, occupant: makeInstance(placements[5]) },
+      { position: { row: 'back', index: 0 }, occupant: makeInstance(placements[3]!) },
+      { position: { row: 'back', index: 1 }, occupant: makeInstance(placements[4]!) },
+      { position: { row: 'back', index: 2 }, occupant: makeInstance(placements[5]!) },
     ];
 
     return { ...player, board: { front, back }, openingPlacements: [] };

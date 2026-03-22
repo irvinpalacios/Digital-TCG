@@ -50,7 +50,7 @@ type PlayerState = {
   energy: number;
   energyMax: number;
   actionsRemaining: number;
-  openingPlacements?: FaceDownCard[];
+  openingPlacements?: (FaceDownCard | null)[];
 };
 
 type GameState = {
@@ -68,7 +68,7 @@ type GameAction =
   | { type: 'ATTACK'; attackerSlot: SlotPosition; targetSlot: SlotPosition }
   | { type: 'ACTIVATE_ABILITY'; sourceSlot: SlotPosition; abilityId: string }
   | { type: 'END_TURN' }
-  | { type: 'PLACE_CARD_FACE_DOWN'; cardInstanceId: string; playerId: string }
+  | { type: 'PLACE_CARD_FACE_DOWN'; cardInstanceId: string; playerId: string; targetSlot: { row: 'front' | 'back'; index: 0 | 1 | 2 } }
   | { type: 'REVEAL_BOARDS' };
 
 type FaceDownCard = { instanceId: string; definitionId: string; ownerId: string; revealed: boolean };
