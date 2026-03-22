@@ -4,6 +4,8 @@ export function isLaneClear(laneIndex: SlotIndex, enemyBoard: BoardState): boole
   return enemyBoard.front[laneIndex].occupant === null;
 }
 
+// Determines whether a unit at the given position is eligible to attack at all.
+// Lane restriction logic (which lanes/slots are valid targets) lives in getLegalTargets.
 export function canAttackFromPosition(position: SlotPosition, board: BoardState): boolean {
   if (position.row === 'front') return true;
 
@@ -20,17 +22,35 @@ export function getLegalTargets(
 ): SlotPosition[] {
   if (!canAttackFromPosition(attackerPosition, attackerBoard)) return [];
 
+  const attackerRow = attackerPosition.row;
+  const attackerIndex = attackerPosition.index;
+  const attackerOccupant = attackerBoard[attackerRow][attackerIndex].occupant;
+  if (attackerOccupant === null) return [];
+
+  const isRanged = attackerOccupant.keywords.some((k) => k.keyword === 'Ranged');
+
   const targets: SlotPosition[] = [];
 
-  for (let i = 0; i <= 2; i++) {
-    const laneIndex = i as SlotIndex;
-
-    if (enemyBoard.front[laneIndex].occupant !== null) {
+  function addLaneTargets(laneIndex: SlotIndex) {
+    if (isLaneClear(laneIndex, enemyBoard)) {
+      if (enemyBoard.back[laneIndex].occupant !== null) {
+        targets.push({ row: 'back', index: laneIndex });
+      }
+    } else {
       targets.push({ row: 'front', index: laneIndex });
     }
+  }
 
-    if (isLaneClear(laneIndex, enemyBoard) && enemyBoard.back[laneIndex].occupant !== null) {
-      targets.push({ row: 'back', index: laneIndex });
+  if (!isRanged) {
+    // Melee: same lane only
+    addLaneTargets(attackerIndex);
+  } else {
+    // Ranged: same lane + adjacent lanes
+    const indices: SlotIndex[] = [attackerIndex];
+    if (attackerIndex - 1 >= 0) indices.push((attackerIndex - 1) as SlotIndex);
+    if (attackerIndex + 1 <= 2) indices.push((attackerIndex + 1) as SlotIndex);
+    for (const idx of indices) {
+      addLaneTargets(idx);
     }
   }
 

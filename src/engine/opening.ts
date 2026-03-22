@@ -72,6 +72,9 @@ export function revealOpeningBoards(state: GameState): GameState {
     const placements = player.openingPlacements ?? [];
 
     const makeInstance = (fc: FaceDownCard): CardInstance => {
+      if (fc.instanceId === player.companion.instanceId) {
+        return player.companion;
+      }
       const def = getCardDefinitionOrThrow(fc.definitionId);
       return {
         instanceId: fc.instanceId,

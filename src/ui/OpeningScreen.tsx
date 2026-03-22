@@ -5,6 +5,8 @@ import { getCardDefinition } from '../cards/registry';
 
 export function OpeningScreen() {
   const { state, dispatch } = useGameState();
+  const [draggedCardId, setDraggedCardId] = React.useState<string | null>(null);
+  const [confirmed, setConfirmed] = React.useState(false);
 
   const p1 = state.players.find((p) => p.playerId === 'player-1')!;
   const p2 = state.players.find((p) => p.playerId === 'player-2')!;
@@ -17,10 +19,6 @@ export function OpeningScreen() {
   const activePlayer = state.players.find((p) => p.playerId === activePlacer)!;
   const activePlaced = activePlacer === 'player-1' ? p1Placed : p2Placed;
   const bothReady = p1Placed === 6 && p2Placed === 6;
-
-  function handleCardClick(cardInstanceId: string) {
-    dispatch({ type: 'PLACE_CARD_FACE_DOWN', cardInstanceId, playerId: activePlacer });
-  }
 
   function handleReveal() {
     dispatch({ type: 'REVEAL_BOARDS' });
@@ -65,11 +63,18 @@ export function OpeningScreen() {
                 return (
                   <div
                     key={idx}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (draggedCardId) {
+                        dispatch({ type: 'PLACE_CARD_FACE_DOWN', cardInstanceId: draggedCardId, playerId: activePlacer });
+                        setDraggedCardId(null);
+                      }
+                    }}
                     style={{
                       width: '80px',
                       height: '56px',
                       background: filled ? '#2a4a2a' : '#222',
-                      border: `1px solid ${filled ? '#4a8a4a' : '#444'}`,
+                      border: draggedCardId && !filled ? '1px dashed #f0c040' : filled ? '1px solid #4a8a4a' : '1px solid #444',
                       borderRadius: '4px',
                       display: 'flex',
                       alignItems: 'center',
@@ -100,11 +105,13 @@ export function OpeningScreen() {
               return (
                 <div
                   key={card.instanceId}
-                  onClick={() => handleCardClick(card.instanceId)}
+                  draggable={true}
+                  onDragStart={() => setDraggedCardId(card.instanceId)}
+                  onDragEnd={() => setDraggedCardId(null)}
                   style={{
                     padding: '10px',
                     background: '#1e2a3a',
-                    border: '1px solid #5a8aaa',
+                    border: draggedCardId === card.instanceId ? '1px solid #f0c040' : '1px solid #5a8aaa',
                     borderRadius: '4px',
                     cursor: 'pointer',
                     minWidth: '90px',
@@ -126,12 +133,30 @@ export function OpeningScreen() {
         </div>
       )}
 
-      {/* Reveal button */}
-      {bothReady && (
+      {/* Reveal section */}
+      {bothReady && !confirmed && (
         <div style={{ textAlign: 'center', marginTop: '16px' }}>
           <p style={{ color: '#8f8', marginBottom: '12px' }}>Both players have placed all 6 cards.</p>
+          <div style={{ display: 'flex', gap: '40px', justifyContent: 'center', marginBottom: '16px' }}>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ color: '#aaa', marginBottom: '4px' }}>Player 1:</div>
+              {(p1.openingPlacements ?? []).map((fc) => (
+                <div key={fc.instanceId} style={{ color: '#ccc', fontSize: '12px' }}>
+                  {getCardDefinition(fc.definitionId)?.name ?? fc.definitionId}
+                </div>
+              ))}
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ color: '#aaa', marginBottom: '4px' }}>Player 2:</div>
+              {(p2.openingPlacements ?? []).map((fc) => (
+                <div key={fc.instanceId} style={{ color: '#ccc', fontSize: '12px' }}>
+                  {getCardDefinition(fc.definitionId)?.name ?? fc.definitionId}
+                </div>
+              ))}
+            </div>
+          </div>
           <button
-            onClick={handleReveal}
+            onClick={() => setConfirmed(true)}
             style={{
               padding: '12px 32px',
               background: '#2a6a2a',
@@ -143,8 +168,46 @@ export function OpeningScreen() {
               fontFamily: 'monospace',
             }}
           >
-            Reveal Boards
+            Confirm and Reveal
           </button>
+        </div>
+      )}
+
+      {bothReady && confirmed && (
+        <div style={{ textAlign: 'center', marginTop: '16px' }}>
+          <p style={{ color: '#f0c040', marginBottom: '16px' }}>Are you sure? Boards will be revealed and the game begins.</p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={handleReveal}
+              style={{
+                padding: '12px 32px',
+                background: '#2a6a2a',
+                color: '#fff',
+                border: '2px solid #4aaa4a',
+                borderRadius: '6px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                fontFamily: 'monospace',
+              }}
+            >
+              Yes, Reveal Boards
+            </button>
+            <button
+              onClick={() => setConfirmed(false)}
+              style={{
+                padding: '12px 32px',
+                background: '#3a2a2a',
+                color: '#fff',
+                border: '2px solid #8a4a4a',
+                borderRadius: '6px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                fontFamily: 'monospace',
+              }}
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       )}
     </div>

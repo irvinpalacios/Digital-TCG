@@ -35,6 +35,7 @@ export function BoardSlot({ slot, isLegalTarget, isSelected, onClick }: BoardSlo
           <div>{name}</div>
           <div>HP: {slot.occupant.currentHp}</div>
           <div>ATK: {slot.occupant.currentAttack}</div>
+          <div>{slot.occupant.keywords.some((k) => k.keyword === 'Ranged') ? 'Ranged' : 'Melee'}</div>
         </>
       ) : (
         <div>Empty</div>

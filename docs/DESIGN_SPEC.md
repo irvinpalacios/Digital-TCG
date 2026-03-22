@@ -98,6 +98,14 @@ This is one of the game's strongest differentiators.
 - Front row protects back row
 - If a front slot is **empty**, the back-row unit in the same lane is **vulnerable** — attackers may target it directly
 
+### Targeting Rules
+
+- **Melee units** attack the enemy slot directly in front of them (same lane index)
+- If that front slot is empty, melee can reach the back slot in the same lane
+- **Ranged units** can attack their own lane plus adjacent lanes (up to 3 lanes wide)
+- For each targetable lane, if the front slot is empty the back slot in that lane is also targetable
+- Ranged units cannot target a back slot if the front slot in that lane is occupied
+
 ---
 
 ## Action Economy

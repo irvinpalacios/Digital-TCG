@@ -41,6 +41,8 @@ Rules:
 - If a front slot is **empty**, the back row unit behind it becomes **vulnerable** through that lane
 - Units may move into **empty adjacent slots** (costs 1 action, 0 Energy)
 
+Lane targeting: Units can only attack within their lane (same index). Ranged units extend to adjacent lanes. Melee attacks only directly forward in the same lane.
+
 ---
 
 ## Win Condition
