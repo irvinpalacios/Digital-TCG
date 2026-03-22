@@ -1,5 +1,6 @@
 /// <reference path="../state/types.ts" />
 import { GAME_CONSTANTS } from '../../config/gameConstants';
+import { getCardDefinitionOrThrow } from '../cards/registry';
 
 export function startTurn(state: GameState): GameState {
   const updatedPlayers = state.players.map((player) => {
@@ -85,21 +86,28 @@ export function checkCompanionEvolution(state: GameState, playerId: string): Gam
   const threshold = companion.evolutionChargeThreshold;
 
   if (companion.evolutionStage === 1 && companion.charge >= threshold) {
+    const evolvedDef = getCardDefinitionOrThrow(companion.evolutionDefinitionId);
     const updatedPlayers = state.players.map((p) =>
       p.playerId !== playerId
         ? p
-        : { ...p, companion: { ...p.companion, evolutionStage: 2 as EvolutionStage } },
+        : {
+            ...p,
+            companion: {
+              ...p.companion,
+              currentHp: evolvedDef.hp,
+              currentAttack: evolvedDef.attack,
+              keywords: evolvedDef.keywords,
+              evolutionStage: 2 as EvolutionStage,
+            },
+          },
     ) as [PlayerState, PlayerState];
 
     return {
       ...state,
       players: updatedPlayers,
-      eventLog: [...state.eventLog, 'Companion evolved!'],
+      eventLog: [...state.eventLog, `${playerId}'s companion evolved into ${evolvedDef.name}!`],
     };
   }
 
-  return {
-    ...state,
-    eventLog: [...state.eventLog, 'No evolution this turn.'],
-  };
+  return state;
 }

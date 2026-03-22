@@ -278,12 +278,19 @@ Bugs found and fixed during development. Do not re-introduce these.
 | **Attack and move consumed no actions** | `resolveAttack` and `resolveMove` had no `spendAction` call — players could attack and move unlimited times | Added `spendAction(result, playerId)` at end of both functions; added `hasActionsRemaining` guard at top of both |
 | **`FaceDownCard` missing `definitionId`** | Original `FaceDownCard` type had no `definitionId` field — `revealOpeningBoards` couldn't look up the card definition at reveal time | Added `definitionId: string` to `FaceDownCard`; `placeCardFaceDown` copies it from the `CardInstance` |
 | **`placeCardFaceDown` appended to array end** | Cards were pushed onto `openingPlacements` in click order with no slot mapping — there was no way to control which board slot a card ended up in | Replaced with a 6-element sparse array indexed by slot number (front 0-2, back 3-5); `placeCardFaceDown` now takes `targetSlot` and inserts at the correct index |
+| **Turn 1 had no draw and wrong energy** | `REVEAL_BOARDS` and auto-reveal transitioned to `'main'` without calling `startTurn` — players started with 0 cards | Both reducer cases now call `startTurn(revealOpeningBoards(...))` |
+| **Evolution permanently blocked** | `checkCompanionEvolution` was never called in `startTurn`; `evolutionChargeThreshold` was never copied from `CardDefinition` onto `CompanionInstance` so threshold resolved to `Infinity` | Added `evolutionChargeThreshold` field to `CompanionInstance` type; `buildCompanionInstance` copies it from the def; `startTurn` now calls `gainCharge` (baseline) then `checkCompanionEvolution` |
+| **Evolution didn't apply evolved stats** | `checkCompanionEvolution` only bumped `evolutionStage` to 2 — it never looked up the evolved definition to apply new HP/ATK/keywords | Now calls `getCardDefinitionOrThrow(companion.evolutionDefinitionId)` and applies `currentHp`, `currentAttack`, `keywords` from the evolved def |
+| **No baseline charge gained per turn** | `CHARGE_BASELINE_PER_TURN` was defined but never used anywhere | `startTurn` now calls `gainCharge(next, activePlayerId, CHARGE_BASELINE_PER_TURN)` after energy reset |
+| **Death Flare only castable on own empty slots** | `playerLegalTargets` for spells used `getLegalPlaySlots` (empty slots only); `handleEnemySlotClick` only handled attacks, not spell casts | Added `isDeathFlare` flag; when true, all 6 enemy slots are shown as legal targets and clicking any enemy slot dispatches `PLAY_CARD` |
+| **Death Flare didn't detect companion kill** | `handleDeath` clears board slots but never sets `winner`; Death Flare's death loop called `handleDeath` but didn't check for companion death afterward | Added post-loop win check in Death Flare: iterates `next.players`, sets `winner` + `phase: 'ended'` if any companion HP ≤ 0 |
+| **Sharpen Instinct applied no effect** | `playUpgradeCard` had only a generic stub — all upgrades removed the card and spent resources but changed nothing | Added `'sharpen-instinct'` case: applies `+2 currentAttack` to the board slot occupant at `targetSlot` |
 
 ---
 
 ## Session Snapshot
 
-*Updated 2026-03-21. Overwrites previous snapshot entirely.*
+*Updated 2026-03-22. Overwrites previous snapshot entirely.*
 
 ---
 
@@ -292,37 +299,38 @@ Bugs found and fixed during development. Do not re-introduce these.
 | Phase | Description | Status |
 |---|---|---|
 | Phase 1 | Core type system — `types.ts` (global ambient), `initialState.ts` (empty board + player factories) | ✅ Done |
-| Phase 2 | Turn flow — `startTurn` (energy reset, draw to hand cap), `endTurn`, `drawCard`, `gainCharge`, `checkCompanionEvolution` | ✅ Done |
-| Phase 3 | Combat + movement — `resolveAttack` (with action cost, win detection, companion sync), `resolveMove` (with action cost), `dealDamage`, `handleDeath` | ✅ Done |
-| Phase 4 | Card play — `playUnitCard`, `playSpellCard` (stubbed effects), `playUpgradeCard` (stubbed effects); `spendAction` exported for reuse | ✅ Done |
-| Phase 5 | Opening engine — `placeCardFaceDown` (sparse array, slot targeting), `isReadyToReveal`, `revealOpeningBoards` (companion instance preserved) | ✅ Done |
+| Phase 2 | Turn flow — `startTurn` (energy reset, draw to hand cap, baseline charge, evolution check), `endTurn`, `gainCharge`, `checkCompanionEvolution` | ✅ Done |
+| Phase 3 | Combat + movement — `resolveAttack` (action cost, win detection, companion sync), `resolveMove` (action cost), `dealDamage`, `handleDeath` | ✅ Done |
+| Phase 4 | Card play — `playUnitCard`, `playSpellCard` (Soul Kindle, Death Flare), `playUpgradeCard` (Ember Mantle, Sharpen Instinct); `spendAction` exported | ✅ Done |
+| Phase 5 | Opening engine — `placeCardFaceDown` (sparse array, slot targeting), `isReadyToReveal`, `revealOpeningBoards` + `startTurn` called after reveal | ✅ Done |
 | Pre-6 | Card data — 16 `CardDefinition` objects, `getCardDefinition`/`getCardDefinitionOrThrow` registry, `tempoDeck` + `sacrificeDeck` configs | ✅ Done |
 | Phase 6 | UI — all components wired to real state; `GameRouter` routes by phase; `GameScreen` has full click/selection/dispatch loop | ✅ Done |
 | Opening Fixes | Sparse placement array; slot-targeted drag-and-drop; `playerId` field on action; count fix (non-null filter); two-step reveal confirmation | ✅ Done |
-| Action economy | `resolveAttack` and `resolveMove` both call `spendAction`; both guard with `hasActionsRemaining` before executing | ✅ Done |
+| Action economy | `resolveAttack` and `resolveMove` both call `spendAction`; both guard with `hasActionsRemaining`; auto-end turn when actions reach 0 | ✅ Done |
 | Companion sync | `dealDamage` updates both board slot occupant and `player.companion.currentHp` in the same map pass | ✅ Done |
-| Lane targeting | `getLegalTargets` rewritten: melee attacks same lane only; ranged attacks own lane + adjacent (index ±1); back slot only reachable when front is empty | ✅ Done |
-| UI polish | `Hand.tsx` shows cost (⚡), color-coded type badge, and tooltip for Spell/Upgrade on hover; `HUD.tsx` shows deck count; `BoardSlot.tsx` shows HP, ATK, Melee/Ranged | ✅ Done |
+| Lane targeting | `getLegalTargets` rewritten: melee same lane only; ranged own lane + adjacent (±1); back slot reachable only when front is empty | ✅ Done |
+| Evolution system | `checkCompanionEvolution` called every `startTurn`; threshold stored on instance; evolved def stats applied to companion on trigger | ✅ Done |
+| Card effects | Soul Kindle (+3 Charge via sacrifice), Death Flare (2 AoE damage + Charge per kill), Ember Mantle (+2 HP/+1 ATK companion), Sharpen Instinct (+2 ATK unit) | ✅ Done |
+| UI polish | `Hand.tsx` type badges, cost, HP/ATK; `BoardSlot.tsx` shows HP, ATK, Melee/Ranged; auto-pass banner; Death Flare highlights enemy board | ✅ Done |
 
 ---
 
 ### Current State of the Game (what works when you run `npm run dev`)
 
 - Game opens in `phase: 'opening'`
-- Each player has 6 cards in hand: their companion + 5 deck cards
-- Player 1 places first (drag cards to grid slots), then Player 2
-- Placement grid shows each slot as filled/empty; dashed yellow border on valid drop targets during drag
-- After both place 6, a two-step confirm → reveal flow transitions to `phase: 'main'`
-- `revealOpeningBoards` places each card into its chosen board slot; companion instance is preserved (not rebuilt from definition)
+- Each player has 6 cards in hand: companion + 5 deck cards; drag to placement grid, front/back rows
+- After both players place 6, two-step confirm → reveal transitions to `phase: 'main'`; `startTurn` fires immediately so turn 1 has correct energy, actions, and draw
 - Main screen: enemy board (flipped) on top, event log in middle, player board below, hand + HUD at bottom
-- Cards in hand show: name, cost ⚡, type badge (color-coded), HP/ATK for units, tooltip for spells/upgrades on hover
-- Board slots show: unit name, HP, ATK, Melee/Ranged indicator; green border = legal target; yellow bg = selected
-- HUD shows: energy/max, actions remaining, deck count, companion name/HP/charge; gold border = active player
-- Clicking a hand card selects it; clicking a legal board slot plays it (energy deducted, action spent)
-- Clicking a board unit selects it; clicking a legal adjacent slot moves it (action spent)
-- Clicking an enemy slot while a unit is selected triggers attack (action spent, damage dealt, death handled)
-- End Turn deducts nothing — passes turn, increments turnNumber; next `startTurn` resets energy, grows energyMax, draws to hand cap
-- If companion HP reaches 0, `state.winner` and `state.phase = 'ended'` are set; `GameRouter` shows winner screen
+- Unit cards can be played to empty board slots (Energy deducted, action spent); board shows name/HP/ATK/Melee/Ranged
+- Units can move to adjacent empty slots; melee attacks same-lane enemy; ranged attacks own + adjacent lanes
+- **Soul Kindle**: select from hand, click own non-companion unit to sacrifice it — grants 3 Charge
+- **Death Flare**: select from hand, click any enemy slot — deals 2 damage to all units on both boards, grants 1 Charge per kill; detects companion kill and ends game
+- **Ember Mantle**: select from hand, play on any slot — companion gains +2 HP, +1 ATK; +1 Charge bonus if companion is Ember Wisp
+- **Sharpen Instinct**: select from hand, click own occupied slot — target unit gains +2 ATK permanently
+- Each turn: `startTurn` resets energy (grows +1/turn, cap 6), resets actions to 3, draws to hand cap, grants 1 baseline Charge
+- When active player's actions reach 0, a gold banner appears and the turn auto-ends after 1.2 seconds
+- Evolution: at `startTurn`, if companion charge ≥ threshold, companion stats update to evolved definition (e.g. Auric Cub → Auric Leon)
+- Companion HP → 0 triggers `winner` + `phase: 'ended'`; `GameRouter` shows winner screen
 - TypeScript: zero errors (`npx tsc --noEmit` clean)
 
 ---
@@ -331,17 +339,13 @@ Bugs found and fixed during development. Do not re-introduce these.
 
 | Issue | Location | Notes |
 |---|---|---|
-| **Spell/Upgrade effects stubbed** | `cardPlay.ts` `playSpellCard`, `playUpgradeCard` | Cards are removed from hand, Energy/action spent, but no effect is applied. Soul Kindle, Death Flare, Pack Signal, Pounce Window, Sharpen Instinct, Ember Mantle all do nothing yet. |
-| **No `startTurn` after reveal** | `opening.ts` `revealOpeningBoards`, `store.ts` reducer | After reveal, `phase` becomes `'main'` but `startTurn` is never called. First turn starts with the initial state values (energy=2, actions=3) which happen to be correct, but **no draw happens** — players start turn 1 with 0 cards. |
-| **`checkCompanionEvolution` never called** | `turnFlow.ts` | The function exists and works, but `startTurn` does not call it. Evolution can never trigger. |
-| **`evolutionChargeThreshold` not stored on instance** | `turnFlow.ts`, `store.ts` | `checkCompanionEvolution` casts companion to get `evolutionChargeThreshold`, but `buildCompanionInstance` never copies it from the definition. Threshold resolves to `Infinity` — evolution is permanently blocked. |
-| **`CHARGE_BASELINE_PER_TURN` unused** | `config/gameConstants.ts`, `turnFlow.ts` | Constant defined but never applied. No baseline charge is gained each turn. |
-| **`drawCard` function is dead code** | `turnFlow.ts` | `startTurn` now draws inline; `drawCard` is exported but never called. |
-| **`dragTargetSlot` state unused** | `OpeningScreen.tsx` line 10 | Declared but never read or set after initial declaration. Was a preparatory step that was never wired. |
-| **Opening hand label says "(click to place)"** | `OpeningScreen.tsx` line 101 | Click-to-place was removed; only drag-and-drop works. Label is stale. |
-| **`ActionType` type unused** | `types.ts` line 5 | Declares `'PLAY_CARD' \| 'MOVE_UNIT' \| ...` but `GameAction` union uses inline literal strings. |
-| **Upgrade slot selection missing** | `GameScreen.tsx` | No UI flow to select a target slot when playing an Upgrade card. `playUpgradeCard` accepts `targetSlot` but the caller just passes whatever slot was clicked. |
-| **Opening placement order hardcoded** | `OpeningScreen.tsx` | Player 1 always places first. No randomization. |
+| **Pack Signal, Pounce Window effects missing** | `cardPlay.ts` `playSpellCard` | No case for `'pack-signal'` or `'pounce-window'`. Cards are consumed with no effect. Pack Signal should reposition a unit; Pounce Window should open a lane vulnerability. |
+| **Grave Lancer death bonus missing** | `cardPlay.ts`, `combat.ts` | Grave Lancer has a "bonus on ally death" effect that isn't implemented. `handleDeath` grants Charge keyword value but has no per-card death trigger system. |
+| **Evolution doesn't update board slot** | `turnFlow.ts` `checkCompanionEvolution` | When evolution fires, `player.companion` gets new stats but the board slot occupant is NOT updated. The companion's displayed HP/ATK on the board won't reflect evolved values until it takes damage (which re-syncs via `dealDamage`). |
+| **Upgrade targeting shows wrong highlights** | `GameScreen.tsx` | When Sharpen Instinct is selected from hand, `getLegalPlaySlots` highlights empty slots (unit placement targets). The player must click an occupied slot — which works — but the green borders are misleading. No dedicated "occupied slot" highlight path exists for upgrades. |
+| **Ember Mantle plays on any slot click** | `GameScreen.tsx`, `cardPlay.ts` | Ember Mantle ignores `targetSlot` entirely and always buffs the companion. But the PLAY_CARD dispatch fires when clicking any own slot. If the player clicks an empty slot while Ember Mantle is selected, it dispatches and succeeds — the UI gives no specific indication that the companion is the target. |
+| **Opening placement order hardcoded** | `OpeningScreen.tsx` | Player 1 always places first. No randomization or coin flip. |
+| **`cost` stored via type assertion, not type field** | `store.ts`, `cardPlay.ts` | `cost` is added to `CardInstance` as `CardInstance & { cost: number }` at build time. The base `CardInstance` type has no `cost` field. This works but is fragile — any code that reads `cost` off an instance must use the same cast. |
 
 ---
 
@@ -349,28 +353,28 @@ Bugs found and fixed during development. Do not re-introduce these.
 
 | File | Purpose |
 |---|---|
-| `config/gameConstants.ts` | `GAME_CONSTANTS` — energy cap, growth, hand size cap, actions per turn, charge baseline (unused) |
+| `config/gameConstants.ts` | `GAME_CONSTANTS` — energy cap, growth, hand size cap, actions per turn, `CHARGE_BASELINE_PER_TURN` |
 | `src/main.tsx` | ReactDOM entry — `createRoot` → `<App />` |
 | `src/cards/definitions.ts` | 16 `CardDefinition` objects (both decks + companions + evolved forms) + `allCards[]` |
 | `src/cards/registry.ts` | `getCardDefinition(id)` and `getCardDefinitionOrThrow(id)` |
 | `src/cards/decks.ts` | `DeckConfig` type; `tempoDeck` (Auric Cub) and `sacrificeDeck` (Ember Wisp), 12 cards each |
-| `src/engine/cardPlay.ts` | `playUnitCard`, `playSpellCard` (stub), `playUpgradeCard` (stub), `spendAction` (exported) |
+| `src/engine/cardPlay.ts` | `playUnitCard`; `playSpellCard` (Soul Kindle, Death Flare live; Pack Signal/Pounce Window pending); `playUpgradeCard` (Ember Mantle, Sharpen Instinct live); `spendAction` exported |
 | `src/engine/combat.ts` | `dealDamage` (syncs companion HP), `handleDeath` (Charge keyword), `resolveAttack` (action cost, win detection) |
 | `src/engine/movement.ts` | `resolveMove` — action cost, actions guard, legal move check |
 | `src/engine/opening.ts` | `placeCardFaceDown` (sparse 6-slot array, slot-targeted), `isReadyToReveal`, `revealOpeningBoards` (companion preserved) |
-| `src/engine/turnFlow.ts` | `startTurn` (energy reset + inline draw), `endTurn`, `drawCard` (dead code), `gainCharge`, `checkCompanionEvolution` (never called) |
+| `src/engine/turnFlow.ts` | `startTurn` (energy reset, draw, baseline charge, evolution check), `endTurn`, `gainCharge`, `checkCompanionEvolution` (applies evolved def stats) |
 | `src/rules/movement.ts` | `getAdjacentSlots` (same row ±1, opposite row same index), `getLegalMoves` (empty slots only) |
 | `src/rules/targeting.ts` | `isLaneClear`, `canAttackFromPosition`, `getLegalTargets` (melee same lane; ranged ±1 lane) |
 | `src/rules/validation.ts` | `hasEnoughEnergy`, `hasActionsRemaining`, `isSlotEmpty`, `getLegalPlaySlots` (all empty slots) |
-| `src/state/types.ts` | All global TS types — ambient global pattern, no exports; `openingPlacements` is sparse `(FaceDownCard \| null)[]` |
+| `src/state/types.ts` | All global TS types — `CompanionInstance` has `evolutionChargeThreshold: number`; `openingPlacements` is sparse `(FaceDownCard \| null)[]` |
 | `src/state/initialState.ts` | `createEmptyBoard`, `createInitialPlayerState`, `createInitialGameState` |
-| `src/state/store.ts` | React context + `useReducer`; `gameReducer`; `buildDeckInstances` + `buildCompanionInstance` (both stamp `cost` onto instances) |
+| `src/state/store.ts` | React context + `useReducer`; `gameReducer` calls `startTurn` after reveal; `buildCompanionInstance` copies `evolutionChargeThreshold` |
 | `src/ui/App.tsx` | `GameStateProvider` wraps `GameRouter`; routes `'opening'` → `OpeningScreen`, `'main'` → `GameScreen`, `'ended'`/winner → winner screen |
-| `src/ui/OpeningScreen.tsx` | Drag-and-drop face-down placement; sparse-array `filled` check; two-step reveal confirmation; `dragTargetSlot` state declared but unused |
-| `src/ui/GameScreen.tsx` | Full click/select/dispatch loop; derives `player` + `enemy` from `state.activePlayerId`; hand label with `HAND_SIZE_CAP` |
+| `src/ui/OpeningScreen.tsx` | Drag-and-drop face-down placement; sparse-array `filled` check; two-step reveal confirmation |
+| `src/ui/GameScreen.tsx` | Click/select/dispatch loop; `isDeathFlare` flag for enemy board targeting; auto-end turn `useEffect` with banner |
 | `src/ui/Board.tsx` | 3×2 grid of `BoardSlot`; `flipped` renders back row first for enemy perspective |
 | `src/ui/BoardSlot.tsx` | Name, HP, ATK, Melee/Ranged; green border = legal target; yellow bg = selected |
-| `src/ui/Hand.tsx` | Name, cost ⚡ (gold), type badge (color-coded), HP/ATK for units, tooltip for spells/upgrades; `hoveredCardId` state |
+| `src/ui/Hand.tsx` | Name, cost ⚡ (gold), type badge (color-coded), HP/ATK for units, tooltip for spells/upgrades |
 | `src/ui/HUD.tsx` | Energy/max, actions, deck count, companion name/HP/charge; gold border if active player |
 | `src/ui/EventLog.tsx` | Last 8 entries from `state.eventLog`; fixed 160px height, `overflowY: scroll` |
 
@@ -382,7 +386,7 @@ Bugs found and fixed during development. Do not re-introduce these.
 |---|---|
 | **Lane targeting — Melee** | Attacks only the enemy slot at the same lane index. If front is empty, can reach the back slot in that same lane (no cross-lane). |
 | **Lane targeting — Ranged** | Attacks own lane ± adjacent lanes (up to 3 lanes). For each lane, front slot is the primary target; back slot is reachable only if front is empty. |
-| **Companion as win condition** | Companion HP reaching 0 sets `winner` and `phase: 'ended'` immediately in `resolveAttack`. No separate life total. |
+| **Companion as win condition** | Companion HP reaching 0 sets `winner` and `phase: 'ended'` immediately in `resolveAttack` or the Death Flare loop. No separate life total. |
 | **Opening placement** | Each player places all 6 cards (companion + 5 deck cards) face-down into specific board slots. Reveal is simultaneous. Companion is the first card in the opening hand. |
 | **Action economy** | Playing, moving, and attacking each cost 1 action. Moving costs 0 Energy. Energy is only spent on card play. |
 | **Companion HP sync** | `dealDamage` always updates both `player.companion.currentHp` and the board slot occupant in the same reducer pass. |
@@ -391,11 +395,10 @@ Bugs found and fixed during development. Do not re-introduce these.
 
 ### Next Action
 
-**Phase 7 — Fix the known issues blocking real gameplay, in priority order:**
+**Phase 7 — Remaining work in priority order:**
 
-1. **Call `startTurn` after reveal** — players currently start turn 1 with 0 cards
-2. **Call `checkCompanionEvolution` in `startTurn`** — evolution is currently permanently blocked
-3. **Copy `evolutionChargeThreshold` onto companion instance** in `buildCompanionInstance`
-4. **Apply baseline charge gain per turn** — `CHARGE_BASELINE_PER_TURN` is defined but unused
-5. **Implement at least one spell effect** — Soul Kindle (sacrifice for 3 Charge) to make the Sacrifice deck playable
-6. **Clean up dead code** — `drawCard`, `dragTargetSlot`, stale hand label
+1. **Fix evolution board slot sync** — `checkCompanionEvolution` updates `player.companion` but not the board slot occupant. Add the same board-slot scan that `dealDamage` uses to apply the new stats to the slot.
+2. **Implement Pack Signal** — reposition a friendly unit to an empty adjacent slot (spell, cost 1)
+3. **Implement Pounce Window** — force an enemy front-row unit to move back, opening a lane (spell, cost 1)
+4. **Fix upgrade targeting highlights** — when an Upgrade card is selected, `getLegalPlaySlots` shows empty slots; should show occupied own-board slots instead
+5. **Implement Grave Lancer death bonus** — bonus trigger when a friendly unit dies while Grave Lancer is on the board

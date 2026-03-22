@@ -2,6 +2,7 @@
 import { GAME_CONSTANTS } from '../../config/gameConstants';
 import { hasEnoughEnergy, hasActionsRemaining, isSlotEmpty } from '../rules/validation';
 import { getCardDefinition } from '../cards/registry';
+import { dealDamage, handleDeath } from './combat';
 
 function getCardDefinitionByInstance(card: CardInstance): CardDefinition | undefined {
   return getCardDefinition(card.definitionId);
@@ -90,6 +91,66 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
 
   const def = getCardDefinitionByInstance(card);
 
+  // Death Flare: deal 2 damage to all units on both boards; gain 1 Charge per kill
+  if (def?.id === 'death-flare') {
+    const removedPlayers = state.players.map((p) =>
+      p.playerId !== active.playerId ? p : { ...p, hand: p.hand.filter((c) => c.instanceId !== cardInstanceId) },
+    ) as [PlayerState, PlayerState];
+    let next = { ...state, players: removedPlayers };
+    next = spendEnergy(next, active.playerId, card.cost);
+    next = spendAction(next, active.playerId);
+    next = { ...next, eventLog: [...next.eventLog, `${active.playerId} played Death Flare — 2 damage to all units!`] };
+
+    const rows: Row[] = ['front', 'back'];
+    const indices: SlotIndex[] = [0, 1, 2];
+
+    for (const origPlayer of state.players) {
+      for (const row of rows) {
+        for (const idx of indices) {
+          if (origPlayer.board[row][idx].occupant !== null) {
+            next = dealDamage(next, origPlayer.playerId, { row, index: idx }, 2);
+          }
+        }
+      }
+    }
+
+    let deathCount = 0;
+    for (const origPlayer of state.players) {
+      for (const row of rows) {
+        for (const idx of indices) {
+          const livePlayer = next.players.find((p) => p.playerId === origPlayer.playerId)!;
+          const occupant = livePlayer.board[row][idx].occupant;
+          if (occupant !== null && occupant.currentHp <= 0) {
+            deathCount++;
+            next = handleDeath(next, origPlayer.playerId, { row, index: idx });
+          }
+        }
+      }
+    }
+
+    if (deathCount > 0) {
+      const chargedPlayers = next.players.map((p) =>
+        p.playerId !== active.playerId ? p :
+        { ...p, companion: { ...p.companion, charge: p.companion.charge + deathCount } },
+      ) as [PlayerState, PlayerState];
+      next = {
+        ...next,
+        players: chargedPlayers,
+        eventLog: [...next.eventLog, `Death Flare killed ${deathCount} unit${deathCount !== 1 ? 's' : ''} — ${active.playerId} gained ${deathCount} Charge.`],
+      };
+    }
+
+    // Check if any companion was killed by the flare
+    for (const p of next.players) {
+      if (p.companion.currentHp <= 0) {
+        const winnerId = next.players.find((pl) => pl.playerId !== p.playerId)!.playerId;
+        next = { ...next, winner: winnerId, phase: 'ended' };
+      }
+    }
+
+    return next;
+  }
+
   // Soul Kindle: sacrifice a unit on own board, gain 3 Charge
   if (def?.id === 'soul-kindle' && targetSlot) {
     const targetOccupant = active.board[targetSlot.row][targetSlot.index].occupant;
@@ -145,8 +206,78 @@ export function playUpgradeCard(
   if (!hasEnoughEnergy(active, card.cost)) {
     return { ...state, eventLog: [...state.eventLog, `Warning: ${active.playerId} has insufficient energy to play ${card.instanceId}.`] };
   }
+  const upgradeDef = getCardDefinitionByInstance(card);
+
+  // Ember Mantle: companion gains +2 HP and +1 ATK; gain 1 Charge if companion is Ember Wisp
+  if (upgradeDef?.id === 'ember-mantle') {
+    const removedPlayers = state.players.map((p) =>
+      p.playerId !== active.playerId ? p : { ...p, hand: p.hand.filter((c) => c.instanceId !== cardInstanceId) },
+    ) as [PlayerState, PlayerState];
+    let next = { ...state, players: removedPlayers };
+    next = spendEnergy(next, active.playerId, card.cost);
+    next = spendAction(next, active.playerId);
+
+    const buffedPlayers = next.players.map((p) => {
+      if (p.playerId !== active.playerId) return p;
+      const newHp = p.companion.currentHp + 2;
+      const newAtk = p.companion.currentAttack + 1;
+      const companionId = p.companion.instanceId;
+      const buffRow = (row: Row): [Slot, Slot, Slot] =>
+        p.board[row].map((s) =>
+          s.occupant?.instanceId === companionId
+            ? { ...s, occupant: { ...s.occupant, currentHp: newHp, currentAttack: newAtk } }
+            : s,
+        ) as [Slot, Slot, Slot];
+      return {
+        ...p,
+        companion: { ...p.companion, currentHp: newHp, currentAttack: newAtk },
+        board: { front: buffRow('front'), back: buffRow('back') },
+      };
+    }) as [PlayerState, PlayerState];
+    next = { ...next, players: buffedPlayers };
+
+    const isEmberWisp = active.companion.definitionId === 'ember-wisp';
+    if (isEmberWisp) {
+      const chargedPlayers = next.players.map((p) =>
+        p.playerId !== active.playerId ? p :
+        { ...p, companion: { ...p.companion, charge: p.companion.charge + 1 } },
+      ) as [PlayerState, PlayerState];
+      next = { ...next, players: chargedPlayers };
+    }
+
+    return {
+      ...next,
+      eventLog: [...next.eventLog, `${active.playerId} equipped Ember Mantle — companion +2 HP, +1 ATK${isEmberWisp ? ', +1 Charge' : ''}.`],
+    };
+  }
+
   if (isSlotEmpty(active.board, targetSlot)) {
     return { ...state, eventLog: [...state.eventLog, `Warning: target slot ${targetSlot.row}[${targetSlot.index}] has no unit to attach upgrade to.`] };
+  }
+
+  // Sharpen Instinct: +2 ATK to target unit
+  if (upgradeDef?.id === 'sharpen-instinct') {
+    const occupant = active.board[targetSlot.row][targetSlot.index].occupant;
+    const buffedPlayers = state.players.map((p) => {
+      if (p.playerId !== active.playerId) return p;
+      const updatedRow = p.board[targetSlot.row].map((s, i) =>
+        i === targetSlot.index && s.occupant
+          ? { ...s, occupant: { ...s.occupant, currentAttack: s.occupant.currentAttack + 2 } }
+          : s,
+      ) as [Slot, Slot, Slot];
+      return {
+        ...p,
+        hand: p.hand.filter((c) => c.instanceId !== cardInstanceId),
+        board: { ...p.board, [targetSlot.row]: updatedRow },
+      };
+    }) as [PlayerState, PlayerState];
+    let next = { ...state, players: buffedPlayers };
+    next = spendEnergy(next, active.playerId, card.cost);
+    next = spendAction(next, active.playerId);
+    return {
+      ...next,
+      eventLog: [...next.eventLog, `${active.playerId} equipped Sharpen Instinct on ${occupant?.instanceId ?? 'unit'} — +2 ATK.`],
+    };
   }
 
   const updatedPlayers = state.players.map((p) =>
