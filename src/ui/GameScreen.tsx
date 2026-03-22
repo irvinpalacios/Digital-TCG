@@ -10,10 +10,36 @@ import { getLegalPlaySlots } from '../rules/validation';
 import { getLegalMoves } from '../rules/movement';
 import { GAME_CONSTANTS } from '../../config/gameConstants';
 
+function findCompanionSlot(board: BoardState, companionInstanceId: string): SlotPosition | null {
+  const rows: Row[] = ['front', 'back'];
+  const indices: SlotIndex[] = [0, 1, 2];
+  for (const row of rows) {
+    for (const index of indices) {
+      if (board[row][index].occupant?.instanceId === companionInstanceId) {
+        return { row, index };
+      }
+    }
+  }
+  return null;
+}
+
+function getOccupiedSlots(board: BoardState): SlotPosition[] {
+  const rows: Row[] = ['front', 'back'];
+  const indices: SlotIndex[] = [0, 1, 2];
+  const result: SlotPosition[] = [];
+  for (const row of rows) {
+    for (const index of indices) {
+      if (board[row][index].occupant !== null) result.push({ row, index });
+    }
+  }
+  return result;
+}
+
 export function GameScreen() {
   const { state, dispatch } = useGameState();
   const [selectedCardId, setSelectedCardId] = React.useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = React.useState<SlotPosition | null>(null);
+  const [packSignalSource, setPackSignalSource] = React.useState<SlotPosition | null>(null);
   const [autoPassBanner, setAutoPassBanner] = React.useState<string | null>(null);
 
   const player = state.players.find((p) => p.playerId === state.activePlayerId)!;
@@ -24,20 +50,47 @@ export function GameScreen() {
     : null;
 
   const isDeathFlare = selectedCard?.definitionId === 'death-flare';
+  const isPackSignal = selectedCard?.definitionId === 'pack-signal';
+  const isPounceWindow = selectedCard?.definitionId === 'pounce-window';
+  const isEmberMantle = selectedCard?.definitionId === 'ember-mantle';
+  const isSharpenInstinct = selectedCard?.definitionId === 'sharpen-instinct';
 
-  const playerLegalTargets: SlotPosition[] = selectedCard !== null
-    ? (isDeathFlare ? [] : getLegalPlaySlots(selectedCard, player.board))
-    : selectedSlot !== null
-    ? getLegalMoves(selectedSlot, player.board)
-    : [];
+  const playerLegalTargets: SlotPosition[] = (() => {
+    if (selectedCard === null) {
+      return selectedSlot !== null ? getLegalMoves(selectedSlot, player.board) : [];
+    }
+    if (isDeathFlare || isPounceWindow) return [];
+    if (isPackSignal) {
+      return packSignalSource === null
+        ? getOccupiedSlots(player.board)
+        : getLegalMoves(packSignalSource, player.board);
+    }
+    if (isEmberMantle) {
+      const companionSlot = findCompanionSlot(player.board, player.companion.instanceId);
+      return companionSlot ? [companionSlot] : [];
+    }
+    if (isSharpenInstinct) {
+      return getOccupiedSlots(player.board);
+    }
+    return getLegalPlaySlots(selectedCard, player.board);
+  })();
 
-  const enemyLegalTargets: SlotPosition[] = isDeathFlare
-    ? (['front', 'back'] as const).flatMap((row) =>
+  const enemyLegalTargets: SlotPosition[] = (() => {
+    if (isDeathFlare) {
+      return (['front', 'back'] as const).flatMap((row) =>
         ([0, 1, 2] as const).map((index) => ({ row, index })),
-      )
-    : selectedSlot !== null
-    ? getLegalTargets(selectedSlot, player.board, enemy.board)
-    : [];
+      );
+    }
+    if (isPounceWindow) {
+      return ([0, 1, 2] as const)
+        .filter((i) => enemy.board.front[i].occupant !== null && enemy.board.back[i].occupant === null)
+        .map((i) => ({ row: 'front' as Row, index: i as SlotIndex }));
+    }
+    if (selectedSlot !== null) {
+      return getLegalTargets(selectedSlot, player.board, enemy.board);
+    }
+    return [];
+  })();
 
   React.useEffect(() => {
     if (state.phase !== 'main') return;
@@ -48,6 +101,7 @@ export function GameScreen() {
         setAutoPassBanner(null);
         setSelectedCardId(null);
         setSelectedSlot(null);
+        setPackSignalSource(null);
       }, 1200);
       return () => clearTimeout(timer);
     }
@@ -56,41 +110,74 @@ export function GameScreen() {
   function handleCardClick(cardInstanceId: string) {
     if (selectedCardId === cardInstanceId) {
       setSelectedCardId(null);
+      setPackSignalSource(null);
     } else {
       setSelectedCardId(cardInstanceId);
       setSelectedSlot(null);
+      setPackSignalSource(null);
     }
   }
 
   function handlePlayerSlotClick(pos: SlotPosition) {
+    // Pack Signal: two-step — pick source unit, then pick destination
+    if (isPackSignal) {
+      if (packSignalSource === null) {
+        if (player.board[pos.row][pos.index].occupant !== null) {
+          setPackSignalSource(pos);
+        }
+      } else if (packSignalSource.row === pos.row && packSignalSource.index === pos.index) {
+        setPackSignalSource(null);
+      } else if (player.board[pos.row][pos.index].occupant === null) {
+        dispatch({ type: 'PLAY_CARD', cardInstanceId: selectedCardId!, targetSlot: pos, sourceSlot: packSignalSource });
+        setSelectedCardId(null);
+        setPackSignalSource(null);
+        setSelectedSlot(null);
+      } else {
+        setPackSignalSource(pos);
+      }
+      return;
+    }
+
+    // Ember Mantle: only respond to companion slot click
+    if (isEmberMantle) {
+      const companionSlot = findCompanionSlot(player.board, player.companion.instanceId);
+      if (companionSlot && companionSlot.row === pos.row && companionSlot.index === pos.index) {
+        dispatch({ type: 'PLAY_CARD', cardInstanceId: selectedCardId!, targetSlot: pos });
+        setSelectedCardId(null);
+        setSelectedSlot(null);
+      }
+      return;
+    }
+
+    // All other card plays: dispatch on any slot click
     if (selectedCardId !== null) {
       dispatch({ type: 'PLAY_CARD', cardInstanceId: selectedCardId, targetSlot: pos });
       setSelectedCardId(null);
       setSelectedSlot(null);
       return;
     }
+
+    // No card selected: movement / slot selection
     if (selectedSlot && selectedSlot.row === pos.row && selectedSlot.index === pos.index) {
       setSelectedSlot(null);
       return;
     }
     if (selectedSlot !== null) {
-      const targetSlot = player.board[pos.row][pos.index];
-      if (targetSlot.occupant === null) {
+      if (player.board[pos.row][pos.index].occupant === null) {
         dispatch({ type: 'MOVE_UNIT', fromSlot: selectedSlot, toSlot: pos });
         setSelectedSlot(null);
         setSelectedCardId(null);
         return;
       }
     }
-    const slot = player.board[pos.row][pos.index];
-    if (slot.occupant !== null) {
+    if (player.board[pos.row][pos.index].occupant !== null) {
       setSelectedSlot(pos);
       setSelectedCardId(null);
     }
   }
 
   function handleEnemySlotClick(pos: SlotPosition) {
-    if (selectedCardId !== null && isDeathFlare) {
+    if (selectedCardId !== null && (isDeathFlare || isPounceWindow)) {
       dispatch({ type: 'PLAY_CARD', cardInstanceId: selectedCardId, targetSlot: pos });
       setSelectedCardId(null);
       setSelectedSlot(null);
@@ -107,9 +194,11 @@ export function GameScreen() {
     dispatch({ type: 'END_TURN' });
     setSelectedCardId(null);
     setSelectedSlot(null);
+    setPackSignalSource(null);
   }
 
   const isActivePlayer = true;
+  const highlightedPlayerSlot = packSignalSource ?? selectedSlot;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, maxWidth: 420 }}>
@@ -135,7 +224,7 @@ export function GameScreen() {
       <Board
         board={player.board}
         legalTargets={playerLegalTargets}
-        selectedSlot={selectedSlot}
+        selectedSlot={highlightedPlayerSlot}
         onSlotClick={handlePlayerSlotClick}
         flipped={false}
       />

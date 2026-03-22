@@ -87,20 +87,30 @@ export function checkCompanionEvolution(state: GameState, playerId: string): Gam
 
   if (companion.evolutionStage === 1 && companion.charge >= threshold) {
     const evolvedDef = getCardDefinitionOrThrow(companion.evolutionDefinitionId);
-    const updatedPlayers = state.players.map((p) =>
-      p.playerId !== playerId
-        ? p
-        : {
-            ...p,
-            companion: {
-              ...p.companion,
-              currentHp: evolvedDef.hp,
-              currentAttack: evolvedDef.attack,
-              keywords: evolvedDef.keywords,
-              evolutionStage: 2 as EvolutionStage,
-            },
-          },
-    ) as [PlayerState, PlayerState];
+    const updatedPlayers = state.players.map((p) => {
+      if (p.playerId !== playerId) return p;
+      const newHp = evolvedDef.hp;
+      const newAtk = evolvedDef.attack;
+      const newKeywords = evolvedDef.keywords;
+      const companionId = p.companion.instanceId;
+      const syncRow = (row: Row): [Slot, Slot, Slot] =>
+        p.board[row].map((s) =>
+          s.occupant?.instanceId === companionId
+            ? { ...s, occupant: { ...s.occupant, currentHp: newHp, currentAttack: newAtk, keywords: newKeywords } }
+            : s,
+        ) as [Slot, Slot, Slot];
+      return {
+        ...p,
+        companion: {
+          ...p.companion,
+          currentHp: newHp,
+          currentAttack: newAtk,
+          keywords: newKeywords,
+          evolutionStage: 2 as EvolutionStage,
+        },
+        board: { front: syncRow('front'), back: syncRow('back') },
+      };
+    }) as [PlayerState, PlayerState];
 
     return {
       ...state,

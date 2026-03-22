@@ -75,7 +75,7 @@ export function playUnitCard(
   };
 }
 
-export function playSpellCard(state: GameState, cardInstanceId: string, targetSlot?: SlotPosition): GameState {
+export function playSpellCard(state: GameState, cardInstanceId: string, targetSlot?: SlotPosition, sourceSlot?: SlotPosition): GameState {
   const active = getActivePlayer(state);
   const card = active.hand.find((c) => c.instanceId === cardInstanceId) as CardInstanceWithCost | undefined;
 
@@ -173,6 +173,70 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
     next = spendEnergy(next, active.playerId, card.cost);
     next = spendAction(next, active.playerId);
     return { ...next, eventLog: [...next.eventLog, `${active.playerId} sacrificed ${targetOccupant.instanceId} with Soul Kindle — gained 3 Charge.`] };
+  }
+
+  // Pack Signal: reposition a friendly unit to an adjacent empty slot
+  if (def?.id === 'pack-signal' && sourceSlot && targetSlot) {
+    const sourceOccupant = active.board[sourceSlot.row][sourceSlot.index].occupant;
+    if (!sourceOccupant) {
+      return { ...state, eventLog: [...state.eventLog, `Warning: Pack Signal requires a unit at the source slot.`] };
+    }
+    if (!isSlotEmpty(active.board, targetSlot)) {
+      return { ...state, eventLog: [...state.eventLog, `Warning: Pack Signal target slot is not empty.`] };
+    }
+    const repositionedPlayers = state.players.map((p) => {
+      if (p.playerId !== active.playerId) return p;
+      const clearedRow = p.board[sourceSlot.row].map((s, i) =>
+        i === sourceSlot.index ? { ...s, occupant: null } : s,
+      ) as [Slot, Slot, Slot];
+      const boardAfterClear = { ...p.board, [sourceSlot.row]: clearedRow };
+      const placedRow = boardAfterClear[targetSlot.row].map((s, i) =>
+        i === targetSlot.index ? { ...s, occupant: { ...sourceOccupant, hasMovedThisTurn: true } } : s,
+      ) as [Slot, Slot, Slot];
+      return {
+        ...p,
+        hand: p.hand.filter((c) => c.instanceId !== cardInstanceId),
+        board: { ...boardAfterClear, [targetSlot.row]: placedRow },
+      };
+    }) as [PlayerState, PlayerState];
+    let next = { ...state, players: repositionedPlayers };
+    next = spendEnergy(next, active.playerId, card.cost);
+    next = spendAction(next, active.playerId);
+    return { ...next, eventLog: [...next.eventLog, `${active.playerId} used Pack Signal — repositioned ${sourceOccupant.instanceId} to ${targetSlot.row}[${targetSlot.index}].`] };
+  }
+
+  // Pounce Window: push an enemy front-row unit to the back row of the same lane
+  if (def?.id === 'pounce-window' && targetSlot) {
+    if (targetSlot.row !== 'front') {
+      return { ...state, eventLog: [...state.eventLog, `Warning: Pounce Window must target an enemy front-row unit.`] };
+    }
+    const enemy = state.players.find((p) => p.playerId !== active.playerId)!;
+    const targetOccupant = enemy.board.front[targetSlot.index].occupant;
+    if (!targetOccupant) {
+      return { ...state, eventLog: [...state.eventLog, `Warning: Pounce Window target slot has no unit.`] };
+    }
+    const backSlot: SlotPosition = { row: 'back', index: targetSlot.index };
+    if (!isSlotEmpty(enemy.board, backSlot)) {
+      return { ...state, eventLog: [...state.eventLog, `Warning: Pounce Window cannot push — back slot ${targetSlot.index} is occupied.`] };
+    }
+    const removedPlayers = state.players.map((p) =>
+      p.playerId !== active.playerId ? p : { ...p, hand: p.hand.filter((c) => c.instanceId !== cardInstanceId) },
+    ) as [PlayerState, PlayerState];
+    let next = { ...state, players: removedPlayers };
+    next = spendEnergy(next, active.playerId, card.cost);
+    next = spendAction(next, active.playerId);
+    const pushedPlayers = next.players.map((p) => {
+      if (p.playerId !== enemy.playerId) return p;
+      const newFront = p.board.front.map((s, i) =>
+        i === targetSlot.index ? { ...s, occupant: null } : s,
+      ) as [Slot, Slot, Slot];
+      const newBack = p.board.back.map((s, i) =>
+        i === targetSlot.index ? { ...s, occupant: { ...targetOccupant } } : s,
+      ) as [Slot, Slot, Slot];
+      return { ...p, board: { front: newFront, back: newBack } };
+    }) as [PlayerState, PlayerState];
+    next = { ...next, players: pushedPlayers };
+    return { ...next, eventLog: [...next.eventLog, `${active.playerId} used Pounce Window — pushed ${targetOccupant.instanceId} to back row, lane ${targetSlot.index} is now open!`] };
   }
 
   const updatedPlayers = state.players.map((p) =>

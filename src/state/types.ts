@@ -63,7 +63,7 @@ type GameState = {
 };
 
 type GameAction =
-  | { type: 'PLAY_CARD'; cardInstanceId: string; targetSlot: SlotPosition }
+  | { type: 'PLAY_CARD'; cardInstanceId: string; targetSlot: SlotPosition; sourceSlot?: SlotPosition }
   | { type: 'MOVE_UNIT'; fromSlot: SlotPosition; toSlot: SlotPosition }
   | { type: 'ATTACK'; attackerSlot: SlotPosition; targetSlot: SlotPosition }
   | { type: 'ACTIVATE_ABILITY'; sourceSlot: SlotPosition; abilityId: string }

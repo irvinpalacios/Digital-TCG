@@ -29,7 +29,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         case 'Companion':
           return playUnitCard(state, action.cardInstanceId, action.targetSlot);
         case 'Spell':
-          return playSpellCard(state, action.cardInstanceId, action.targetSlot);
+          return playSpellCard(state, action.cardInstanceId, action.targetSlot, action.sourceSlot);
         case 'Upgrade':
           return playUpgradeCard(state, action.cardInstanceId, action.targetSlot);
         default:
