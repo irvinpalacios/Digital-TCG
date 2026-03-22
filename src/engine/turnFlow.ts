@@ -30,7 +30,7 @@ export function startTurn(state: GameState): GameState {
     active.deck.length,
   );
 
-  return {
+  let next: GameState = {
     ...state,
     players: updatedPlayers,
     eventLog: [
@@ -39,6 +39,11 @@ export function startTurn(state: GameState): GameState {
       ...(drawCount > 0 ? [`${state.activePlayerId} drew ${drawCount} card${drawCount !== 1 ? 's' : ''}.`] : []),
     ],
   };
+
+  next = gainCharge(next, state.activePlayerId, GAME_CONSTANTS.CHARGE_BASELINE_PER_TURN);
+  next = checkCompanionEvolution(next, state.activePlayerId);
+
+  return next;
 }
 
 export function endTurn(state: GameState): GameState {
@@ -54,37 +59,6 @@ export function endTurn(state: GameState): GameState {
       ...state.eventLog,
       `Turn ended. Now player ${nextPlayerId}'s turn.`,
     ],
-  };
-}
-
-export function drawCard(state: GameState): GameState {
-  const active = state.players.find((p) => p.playerId === state.activePlayerId)!;
-
-  if (active.deck.length === 0) {
-    return {
-      ...state,
-      eventLog: [...state.eventLog, `${state.activePlayerId} tried to draw but deck is empty.`],
-    };
-  }
-
-  if (active.hand.length >= GAME_CONSTANTS.HAND_SIZE_CAP) {
-    return {
-      ...state,
-      eventLog: [...state.eventLog, `${state.activePlayerId} tried to draw but hand is full.`],
-    };
-  }
-
-  const [drawn, ...remainingDeck] = active.deck;
-  const updatedPlayers = state.players.map((player) =>
-    player.playerId !== state.activePlayerId
-      ? player
-      : { ...player, hand: [...player.hand, drawn], deck: remainingDeck },
-  ) as [PlayerState, PlayerState];
-
-  return {
-    ...state,
-    players: updatedPlayers,
-    eventLog: [...state.eventLog, `${state.activePlayerId} drew a card.`],
   };
 }
 
@@ -107,9 +81,8 @@ export function gainCharge(state: GameState, playerId: string, amount: number): 
 
 export function checkCompanionEvolution(state: GameState, playerId: string): GameState {
   const player = state.players.find((p) => p.playerId === playerId)!;
-  // evolutionChargeThreshold lives on CardDefinition; cast until card instantiation copies it onto the instance
-  const companion = player.companion as CompanionInstance & { evolutionChargeThreshold?: number };
-  const threshold = companion.evolutionChargeThreshold ?? Infinity;
+  const companion = player.companion;
+  const threshold = companion.evolutionChargeThreshold;
 
   if (companion.evolutionStage === 1 && companion.charge >= threshold) {
     const updatedPlayers = state.players.map((p) =>

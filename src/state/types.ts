@@ -2,7 +2,6 @@ type Row = 'front' | 'back';
 type SlotIndex = 0 | 1 | 2;
 type SlotPosition = { row: Row; index: SlotIndex };
 type GamePhase = 'opening' | 'main' | 'ended';
-type ActionType = 'PLAY_CARD' | 'MOVE_UNIT' | 'ATTACK' | 'ACTIVATE_ABILITY' | 'END_TURN';
 type CardType = 'Unit' | 'Spell' | 'Upgrade' | 'Companion';
 type EvolutionStage = 1 | 2;
 type Keyword = 'Ranged' | 'Charge';
@@ -35,6 +34,7 @@ type CompanionInstance = CardInstance & {
   evolutionStage: EvolutionStage;
   charge: number;
   evolutionDefinitionId: string;
+  evolutionChargeThreshold: number;
 };
 
 type Slot = { position: SlotPosition; occupant: CardInstance | CompanionInstance | null };

@@ -7,7 +7,6 @@ export function OpeningScreen() {
   const { state, dispatch } = useGameState();
   const [draggedCardId, setDraggedCardId] = React.useState<string | null>(null);
   const [confirmed, setConfirmed] = React.useState(false);
-  const [dragTargetSlot, setDragTargetSlot] = React.useState<{row: 'front'|'back', index: 0|1|2} | null>(null);
 
   const p1 = state.players.find((p) => p.playerId === 'player-1')!;
   const p2 = state.players.find((p) => p.playerId === 'player-2')!;
@@ -98,7 +97,7 @@ export function OpeningScreen() {
       {!bothReady && activePlayer.hand.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ textAlign: 'center', color: '#888', marginBottom: '8px' }}>
-            {activePlacer === 'player-1' ? 'Player 1' : 'Player 2'} — Hand (click to place)
+            {activePlacer === 'player-1' ? 'Player 1' : 'Player 2'} — Hand (drag to place)
           </h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
             {activePlayer.hand.map((card) => {

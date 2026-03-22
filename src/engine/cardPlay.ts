@@ -1,6 +1,11 @@
 /// <reference path="../state/types.ts" />
 import { GAME_CONSTANTS } from '../../config/gameConstants';
 import { hasEnoughEnergy, hasActionsRemaining, isSlotEmpty } from '../rules/validation';
+import { getCardDefinition } from '../cards/registry';
+
+function getCardDefinitionByInstance(card: CardInstance): CardDefinition | undefined {
+  return getCardDefinition(card.definitionId);
+}
 
 function getActivePlayer(state: GameState): PlayerState {
   return state.players.find((p) => p.playerId === state.activePlayerId)!;
@@ -69,7 +74,7 @@ export function playUnitCard(
   };
 }
 
-export function playSpellCard(state: GameState, cardInstanceId: string): GameState {
+export function playSpellCard(state: GameState, cardInstanceId: string, targetSlot?: SlotPosition): GameState {
   const active = getActivePlayer(state);
   const card = active.hand.find((c) => c.instanceId === cardInstanceId) as CardInstanceWithCost | undefined;
 
@@ -81,6 +86,32 @@ export function playSpellCard(state: GameState, cardInstanceId: string): GameSta
   }
   if (!hasEnoughEnergy(active, card.cost)) {
     return { ...state, eventLog: [...state.eventLog, `Warning: ${active.playerId} has insufficient energy to play ${card.instanceId}.`] };
+  }
+
+  const def = getCardDefinitionByInstance(card);
+
+  // Soul Kindle: sacrifice a unit on own board, gain 3 Charge
+  if (def?.id === 'soul-kindle' && targetSlot) {
+    const targetOccupant = active.board[targetSlot.row][targetSlot.index].occupant;
+    if (!targetOccupant || targetOccupant.instanceId === active.companion.instanceId) {
+      return { ...state, eventLog: [...state.eventLog, `Warning: Soul Kindle requires a non-companion unit to sacrifice.`] };
+    }
+    const clearedPlayers = state.players.map((p) => {
+      if (p.playerId !== active.playerId) return p;
+      const updatedRow = p.board[targetSlot.row].map((s, i) =>
+        i === targetSlot.index ? { ...s, occupant: null } : s,
+      ) as [Slot, Slot, Slot];
+      return {
+        ...p,
+        hand: p.hand.filter((c) => c.instanceId !== cardInstanceId),
+        board: { ...p.board, [targetSlot.row]: updatedRow },
+        companion: { ...p.companion, charge: p.companion.charge + 3 },
+      };
+    }) as [PlayerState, PlayerState];
+    let next = { ...state, players: clearedPlayers };
+    next = spendEnergy(next, active.playerId, card.cost);
+    next = spendAction(next, active.playerId);
+    return { ...next, eventLog: [...next.eventLog, `${active.playerId} sacrificed ${targetOccupant.instanceId} with Soul Kindle — gained 3 Charge.`] };
   }
 
   const updatedPlayers = state.players.map((p) =>

@@ -29,7 +29,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         case 'Companion':
           return playUnitCard(state, action.cardInstanceId, action.targetSlot);
         case 'Spell':
-          return playSpellCard(state, action.cardInstanceId);
+          return playSpellCard(state, action.cardInstanceId, action.targetSlot);
         case 'Upgrade':
           return playUpgradeCard(state, action.cardInstanceId, action.targetSlot);
         default:
@@ -47,12 +47,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'PLACE_CARD_FACE_DOWN': {
       const placed = placeCardFaceDown(state, action.playerId, action.cardInstanceId, action.targetSlot);
       if (isReadyToReveal(placed)) {
-        return revealOpeningBoards(placed);
+        return startTurn(revealOpeningBoards(placed));
       }
       return placed;
     }
     case 'REVEAL_BOARDS':
-      return revealOpeningBoards(state);
+      return startTurn(revealOpeningBoards(state));
     default:
       return state;
   }
@@ -94,6 +94,7 @@ function buildCompanionInstance(deckConfig: DeckConfig, ownerId: string): Compan
     evolutionStage: 1,
     charge: 0,
     evolutionDefinitionId: def.evolutionTarget ?? '',
+    evolutionChargeThreshold: def.evolutionChargeThreshold ?? Infinity,
     cost: 0,
   } as CompanionInstance & { cost: number };
 }
