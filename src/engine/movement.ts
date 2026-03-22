@@ -1,5 +1,7 @@
 /// <reference path="../state/types.ts" />
 import { getLegalMoves } from '../rules/movement';
+import { spendAction } from './cardPlay';
+import { hasActionsRemaining } from '../rules/validation';
 
 export function resolveMove(
   state: GameState,
@@ -8,6 +10,11 @@ export function resolveMove(
   toPosition: SlotPosition,
 ): GameState {
   const player = state.players.find((p) => p.playerId === playerId)!;
+
+  if (!hasActionsRemaining(player)) {
+    return { ...state, eventLog: [...state.eventLog, `Warning: ${playerId} has no actions remaining.`] };
+  }
+
   const fromSlot = player.board[fromPosition.row][fromPosition.index];
 
   if (fromSlot.occupant === null) {
@@ -47,7 +54,7 @@ export function resolveMove(
     return { ...p, board: { ...boardAfterClear, [toPosition.row]: filledTo } };
   }) as [PlayerState, PlayerState];
 
-  return {
+  let result: GameState = {
     ...state,
     players: updatedPlayers,
     eventLog: [
@@ -55,4 +62,8 @@ export function resolveMove(
       `${movedOccupant.instanceId} moved from ${fromPosition.row}[${fromPosition.index}] to ${toPosition.row}[${toPosition.index}] (${playerId}).`,
     ],
   };
+
+  result = spendAction(result, playerId);
+
+  return result;
 }

@@ -14,8 +14,8 @@ export function GameScreen() {
   const [selectedCardId, setSelectedCardId] = React.useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = React.useState<SlotPosition | null>(null);
 
-  const player = state.players.find((p) => p.playerId === 'player-1')!;
-  const enemy = state.players.find((p) => p.playerId === 'player-2')!;
+  const player = state.players.find((p) => p.playerId === state.activePlayerId)!;
+  const enemy = state.players.find((p) => p.playerId !== state.activePlayerId)!;
 
   const selectedCard = selectedCardId !== null
     ? player.hand.find((c) => c.instanceId === selectedCardId) ?? null
@@ -81,7 +81,7 @@ export function GameScreen() {
     setSelectedSlot(null);
   }
 
-  const isActivePlayer = state.activePlayerId === 'player-1';
+  const isActivePlayer = true;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, maxWidth: 420 }}>

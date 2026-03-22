@@ -1,6 +1,8 @@
 /// <reference path="../state/types.ts" />
 import { GAME_CONSTANTS } from '../../config/gameConstants';
 import { gainCharge } from './turnFlow';
+import { spendAction } from './cardPlay';
+import { hasActionsRemaining } from '../rules/validation';
 
 function getSlot(board: BoardState, position: SlotPosition): Slot {
   return board[position.row][position.index];
@@ -26,9 +28,12 @@ export function dealDamage(
       i === targetPosition.index ? { ...s, occupant: updatedOccupant } : s,
     ) as [Slot, Slot, Slot];
 
+    const isCompanion = occupant.instanceId === player.companion.instanceId;
+
     return {
       ...player,
       board: { ...player.board, [targetPosition.row]: updatedRow },
+      companion: isCompanion ? { ...player.companion, currentHp: newHp } : player.companion,
     };
   }) as [PlayerState, PlayerState];
 
@@ -87,6 +92,11 @@ export function resolveAttack(
   targetPosition: SlotPosition,
 ): GameState {
   const attackerPlayer = state.players.find((p) => p.playerId === attackerPlayerId)!;
+
+  if (!hasActionsRemaining(attackerPlayer)) {
+    return { ...state, eventLog: [...state.eventLog, `Warning: ${attackerPlayerId} has no actions remaining.`] };
+  }
+
   const attacker = getSlot(attackerPlayer.board, attackerPosition).occupant;
   if (attacker === null) return state;
 
@@ -97,14 +107,15 @@ export function resolveAttack(
     targetOccupant.instanceId === targetPlayer.companion.instanceId;
 
   let next = dealDamage(state, targetPlayerId, targetPosition, attacker.currentAttack);
-  next = handleDeath(next, targetPlayerId, targetPosition);
 
   if (isCompanionTarget) {
     const companionHp = next.players.find((p) => p.playerId === targetPlayerId)!.companion.currentHp;
     if (companionHp <= 0) {
-      next = { ...next, winner: attackerPlayerId };
+      next = { ...next, winner: attackerPlayerId, phase: 'ended' };
     }
   }
+
+  next = handleDeath(next, targetPlayerId, targetPosition);
 
   const markedPlayers = next.players.map((player) => {
     if (player.playerId !== attackerPlayerId) return player;
@@ -115,7 +126,7 @@ export function resolveAttack(
     return { ...player, board: { ...player.board, [attackerPosition.row]: updatedRow } };
   }) as [PlayerState, PlayerState];
 
-  return {
+  let result: GameState = {
     ...next,
     players: markedPlayers,
     eventLog: [
@@ -123,4 +134,8 @@ export function resolveAttack(
       `${attacker.instanceId} attacked ${targetOccupant?.instanceId ?? 'empty'} for ${attacker.currentAttack}.`,
     ],
   };
+
+  result = spendAction(result, attackerPlayerId);
+
+  return result;
 }

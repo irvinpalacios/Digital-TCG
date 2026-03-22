@@ -19,7 +19,7 @@ export function OpeningScreen() {
   const bothReady = p1Placed === 6 && p2Placed === 6;
 
   function handleCardClick(cardInstanceId: string) {
-    dispatch({ type: 'PLACE_CARD_FACE_DOWN', cardInstanceId });
+    dispatch({ type: 'PLACE_CARD_FACE_DOWN', cardInstanceId, playerId: activePlacer });
   }
 
   function handleReveal() {

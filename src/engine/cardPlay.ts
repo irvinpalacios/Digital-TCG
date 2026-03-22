@@ -13,7 +13,7 @@ function spendEnergy(state: GameState, playerId: string, amount: number): GameSt
   return { ...state, players: updatedPlayers };
 }
 
-function spendAction(state: GameState, playerId: string): GameState {
+export function spendAction(state: GameState, playerId: string): GameState {
   const updatedPlayers = state.players.map((p) =>
     p.playerId !== playerId ? p : { ...p, actionsRemaining: p.actionsRemaining - 1 },
   ) as [PlayerState, PlayerState];
