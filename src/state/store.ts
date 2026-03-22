@@ -101,21 +101,37 @@ const base = createInitialGameState('player-1', 'player-2');
 const p1FullDeck = buildDeckInstances(tempoDeck, 'player-1');
 const p2FullDeck = buildDeckInstances(sacrificeDeck, 'player-2');
 
+const p1Companion = buildCompanionInstance(tempoDeck, 'player-1');
+const p2Companion = buildCompanionInstance(sacrificeDeck, 'player-2');
+
+function placeCompanionOnBoard(basePlayer: PlayerState, companion: CompanionInstance): PlayerState {
+  const back = basePlayer.board.back.map((s, i) =>
+    i === 1 ? { ...s, occupant: companion } : s,
+  ) as [Slot, Slot, Slot];
+  return { ...basePlayer, board: { ...basePlayer.board, back } };
+}
+
 const initialState: GameState = {
   ...base,
   players: [
-    {
-      ...base.players[0],
-      hand: p1FullDeck.slice(0, 6),
-      deck: p1FullDeck.slice(6),
-      companion: buildCompanionInstance(tempoDeck, 'player-1'),
-    },
-    {
-      ...base.players[1],
-      hand: p2FullDeck.slice(0, 6),
-      deck: p2FullDeck.slice(6),
-      companion: buildCompanionInstance(sacrificeDeck, 'player-2'),
-    },
+    placeCompanionOnBoard(
+      {
+        ...base.players[0],
+        hand: p1FullDeck.slice(0, 6),
+        deck: p1FullDeck.slice(6),
+        companion: p1Companion,
+      },
+      p1Companion,
+    ),
+    placeCompanionOnBoard(
+      {
+        ...base.players[1],
+        hand: p2FullDeck.slice(0, 6),
+        deck: p2FullDeck.slice(6),
+        companion: p2Companion,
+      },
+      p2Companion,
+    ),
   ],
 };
 

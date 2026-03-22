@@ -34,6 +34,7 @@ export function BoardSlot({ slot, isLegalTarget, isSelected, onClick }: BoardSlo
         <>
           <div>{name}</div>
           <div>HP: {slot.occupant.currentHp}</div>
+          <div>ATK: {slot.occupant.currentAttack}</div>
         </>
       ) : (
         <div>Empty</div>
