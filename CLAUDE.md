@@ -244,7 +244,105 @@ tactical-tcg/
 - [x] Design spec complete
 - [x] Two prototype deck identities defined
 - [x] Folder structure initialized
-- [ ] Game state model — **START HERE**
-- [ ] Rules engine
-- [ ] Turn flow
-- [ ] UI wired to real state
+- [x] Game state model (Phase 1)
+- [x] Turn flow engine (Phase 2)
+- [x] Combat and movement (Phase 3)
+- [x] Card play (Phase 4)
+- [x] Opening deployment engine (Phase 5)
+- [x] Card definitions and registry (Pre-6)
+- [x] UI wired to real state (Phase 6)
+- [x] Opening phase UI and routing (Opening Fixes 1–5)
+- [ ] Playtesting and tuning (Phase 7) — NEXT
+
+---
+
+## Session Snapshot
+
+*Updated 2026-03-21. Overwrites previous snapshot entirely.*
+
+---
+
+### Completed Phases
+
+| Phase | Description | Status |
+|---|---|---|
+| Phase 1 | Core type system (`types.ts`, `initialState.ts`) | ✅ Done |
+| Phase 2 | Turn flow engine (`turnFlow.ts` — startTurn, endTurn, drawCard, gainCharge, checkCompanionEvolution) | ✅ Done |
+| Phase 3 | Combat and movement (`combat.ts`, `movement.ts`, `targeting.ts`, `movement rules`) | ✅ Done |
+| Phase 4 | Card play (`cardPlay.ts` — playUnitCard, playSpellCard, playUpgradeCard) | ✅ Done |
+| Phase 5 | Opening deployment engine (`opening.ts` — placeCardFaceDown, isReadyToReveal, revealOpeningBoards) | ✅ Done |
+| Pre-6 | Card definitions, registry, deck configs (`definitions.ts`, `registry.ts`, `decks.ts`) | ✅ Done |
+| Phase 6 | React UI wired to real game state (all UI components + store) | ✅ Done |
+| Opening Fixes 1–5 | Opening phase UI: hand dealing, face-down placement, reveal button, phase routing | ✅ Done |
+
+---
+
+### Current State of the Game
+
+- Game loads into the opening phase (`state.phase === 'opening'`)
+- Player 1 places 6 cards face-down, then Player 2 places 6 cards face-down
+- "Reveal Boards" button appears when both players have placed all 6 — clicking it calls `revealOpeningBoards`, transitions to `phase: 'main'`, and sets up the first turn via `startTurn`
+- Main game screen shows both boards, both hands, both HUDs (energy/actions/companion), and a scrollable event log
+- Both prototype decks are wired with real `CardDefinition` data (Tempo / Sacrifice)
+- TypeScript: zero errors across all files (`npx tsc --noEmit` clean)
+
+---
+
+### Known Issues
+
+- **Spell and Upgrade card play**: `playSpellCard` and `playUpgradeCard` are stubbed — they remove the card from hand but apply no effect. Charge-generating spells (Soul Kindle, Death Flare) do not yet grant Charge.
+- **Upgrade targeting**: `playUpgradeCard` requires a `targetSlot` but the UI's `PLAY_CARD` dispatch always passes `targetSlot`. No slot-selection UI exists for upgrades yet.
+- **Opening placement order**: Player 1 always goes first (hardcoded). No turn-order randomization.
+- **Companion placement**: Companions are not placeable during the opening phase — they are initialized directly onto the board state. This may feel inconsistent with the face-down deployment theme.
+- **Evolution**: `checkCompanionEvolution` runs at start of turn and updates companion stats, but evolved abilities are not yet applied (no ability system exists yet).
+- **No win detection in UI**: `state.winner` can be set by `handleDeath` in `combat.ts`, but the winner screen in `App.tsx` is only shown if `state.phase === 'ended'` or `state.winner !== null`. The `handleDeath` function should set `winner` correctly — verify during playtesting.
+
+---
+
+### Active File List
+
+| File | Purpose |
+|---|---|
+| `config/gameConstants.ts` | `GAME_CONSTANTS` — energy cap, max energy, hand size, actions per turn |
+| `src/main.tsx` | ReactDOM entry — mounts `<App />` into `#root` |
+| `src/cards/definitions.ts` | 16 `CardDefinition` objects for both decks + `allCards[]` export |
+| `src/cards/registry.ts` | `getCardDefinition(id)` and `getCardDefinitionOrThrow(id)` — lookup over `allCards` |
+| `src/cards/decks.ts` | `DeckConfig` type; `tempoDeck` and `sacrificeDeck` (12 card IDs + 1 companion ID each) |
+| `src/engine/cardPlay.ts` | `playUnitCard`, `playSpellCard`, `playUpgradeCard` — pure state reducers |
+| `src/engine/combat.ts` | `dealDamage`, `handleDeath`, `resolveAttack` — pure state reducers; sets `state.winner` |
+| `src/engine/movement.ts` | `resolveMove` — validates and executes unit movement, pure state reducer |
+| `src/engine/opening.ts` | `placeCardFaceDown`, `isReadyToReveal`, `revealOpeningBoards` — opening phase engine |
+| `src/engine/turnFlow.ts` | `startTurn`, `endTurn`, `drawCard`, `gainCharge`, `checkCompanionEvolution` |
+| `src/rules/movement.ts` | `getAdjacentSlots`, `getLegalMoves` — pure validators, no side effects |
+| `src/rules/targeting.ts` | `isLaneClear`, `canAttackFromPosition`, `getLegalTargets` — pure validators |
+| `src/rules/validation.ts` | `hasEnoughEnergy`, `hasActionsRemaining`, `isSlotEmpty`, `getLegalPlaySlots` |
+| `src/state/types.ts` | All global TypeScript types — no exports, ambient global script pattern |
+| `src/state/initialState.ts` | `createEmptyBoard`, `createInitialPlayerState`, `createInitialGameState` |
+| `src/state/store.ts` | React context + `useReducer`; `gameReducer` routes all `GameAction` types; deck/companion init |
+| `src/ui/App.tsx` | Root component — `GameStateProvider` wraps `GameRouter`; routes by `state.phase` |
+| `src/ui/OpeningScreen.tsx` | Opening phase UI — hand display, face-down placement grid, status, Reveal button |
+| `src/ui/GameScreen.tsx` | Main game screen — click logic, legal target highlighting, board layout, End Turn |
+| `src/ui/Board.tsx` | 3×2 grid of `BoardSlot` components; `flipped` prop renders enemy view (back row first) |
+| `src/ui/BoardSlot.tsx` | Single board slot — green border if legal target, yellow bg if selected, registry name lookup |
+| `src/ui/Hand.tsx` | Hand display — card name/type/stats, yellow bg if selected; registry lookup |
+| `src/ui/HUD.tsx` | Player status bar — energy, actions remaining, companion name/HP/charge; gold border if active |
+| `src/ui/EventLog.tsx` | Scrollable log — last 8 entries from `state.eventLog`, fixed 160px height |
+
+---
+
+### Next Action
+
+**Phase 7 — Playtesting.** Run `npm run dev` and play through a full game (Tempo vs Sacrifice).
+
+Verify:
+- Opening placement works for both players
+- Reveal transitions correctly to main phase
+- Cards can be played into slots (Energy cost deducted, actions decremented)
+- Units can move to adjacent empty slots
+- Front-row units can attack; back-row units cannot (unless Ranged)
+- Back-row units become vulnerable when front slot in their lane is empty
+- Companion takes damage and dies → winner is set
+- End Turn passes to opponent, energy/actions reset, hand draws up
+- Evolution fires when Charge threshold is met at start of turn
+
+Identify what feels broken, wrong, or missing. That drives the fix list for Phase 7.

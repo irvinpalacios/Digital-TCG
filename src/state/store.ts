@@ -7,6 +7,7 @@ import { playUnitCard, playSpellCard, playUpgradeCard } from '../engine/cardPlay
 import { resolveMove } from '../engine/movement';
 import { resolveAttack } from '../engine/combat';
 import { startTurn, endTurn } from '../engine/turnFlow';
+import { placeCardFaceDown, isReadyToReveal, revealOpeningBoards } from '../engine/opening';
 
 type GameContextValue = {
   state: GameState;
@@ -43,6 +44,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
     case 'END_TURN':
       return startTurn(endTurn(state));
+    case 'PLACE_CARD_FACE_DOWN': {
+      const placed = placeCardFaceDown(state, state.activePlayerId, action.cardInstanceId);
+      if (isReadyToReveal(placed)) {
+        return revealOpeningBoards(placed);
+      }
+      return placed;
+    }
+    case 'REVEAL_BOARDS':
+      return revealOpeningBoards(state);
     default:
       return state;
   }
@@ -87,17 +97,23 @@ function buildCompanionInstance(deckConfig: DeckConfig, ownerId: string): Compan
 }
 
 const base = createInitialGameState('player-1', 'player-2');
+
+const p1FullDeck = buildDeckInstances(tempoDeck, 'player-1');
+const p2FullDeck = buildDeckInstances(sacrificeDeck, 'player-2');
+
 const initialState: GameState = {
   ...base,
   players: [
     {
       ...base.players[0],
-      deck: buildDeckInstances(tempoDeck, 'player-1'),
+      hand: p1FullDeck.slice(0, 6),
+      deck: p1FullDeck.slice(6),
       companion: buildCompanionInstance(tempoDeck, 'player-1'),
     },
     {
       ...base.players[1],
-      deck: buildDeckInstances(sacrificeDeck, 'player-2'),
+      hand: p2FullDeck.slice(0, 6),
+      deck: p2FullDeck.slice(6),
       companion: buildCompanionInstance(sacrificeDeck, 'player-2'),
     },
   ],
