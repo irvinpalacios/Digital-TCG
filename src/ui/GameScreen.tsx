@@ -245,26 +245,74 @@ export function GameScreen() {
   const turnBorderColor = isActivePlayer ? '#f0c040' : '#444';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, maxWidth: 420 }}>
+    <div style={{
+      minHeight: '100vh',
+      width: '100%',
+      background: '#020817',
+      display: 'flex',
+      flexDirection: 'column',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* Ambient glow — rose/red top half */}
       <div style={{
-        marginLeft: -16,
-        marginRight: -16,
-        marginTop: -16,
-        height: 36,
-        background: '#1a1a1a',
-        borderLeft: `4px solid ${turnBorderColor}`,
-        display: 'flex',
-        alignItems: 'center',
-        paddingLeft: 12,
-        boxSizing: 'border-box',
-        fontFamily: 'monospace',
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: turnColor,
-        letterSpacing: '0.05em',
-      }}>
-        {turnLabel}
+        position: 'absolute',
+        top: '-15%',
+        left: '10%',
+        width: '80%',
+        height: '50%',
+        borderRadius: '50%',
+        background: 'rgba(190, 18, 60, 0.12)',
+        filter: 'blur(80px)',
+        pointerEvents: 'none',
+      }} />
+      {/* Ambient glow — cyan bottom half */}
+      <div style={{
+        position: 'absolute',
+        bottom: '-15%',
+        left: '10%',
+        width: '80%',
+        height: '50%',
+        borderRadius: '50%',
+        background: 'rgba(6, 182, 212, 0.10)',
+        filter: 'blur(80px)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Fixed Tactical Log sidebar — hidden below 1024px via style tag */}
+      <style>{`@media (max-width: 1023px) { #tactical-log-sidebar { display: none !important; } }`}</style>
+      <div
+        id="tactical-log-sidebar"
+        style={{
+          position: 'fixed',
+          right: 16,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 200,
+          background: 'rgba(15, 23, 42, 0.9)',
+          borderRadius: 8,
+          border: '1px solid rgba(51,65,85,0.4)',
+          zIndex: 50,
+          opacity: 0.5,
+          transition: 'opacity 200ms ease',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.opacity = '0.5'; }}
+      >
+        <div style={{
+          fontSize: 9,
+          color: '#475569',
+          fontFamily: 'monospace',
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          padding: '8px 10px 4px',
+        }}>
+          TACTICAL LOG
+        </div>
+        <EventLog log={state.eventLog} />
       </div>
+
+      {/* Turn overlay */}
       {turnOverlay && (
         <div style={{
           position: 'fixed', inset: 0,
@@ -280,71 +328,160 @@ export function GameScreen() {
       {autoPassBanner && (
         <div style={{
           position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
-          background: '#222', color: '#f0c040', padding: '10px 24px',
-          borderRadius: 6, border: '1px solid #f0c040',
+          background: '#0f172a', color: '#f0c040', padding: '10px 24px',
+          borderRadius: 6, border: '1px solid rgba(240,192,64,0.5)',
           fontFamily: 'monospace', fontSize: 14, zIndex: 100,
         }}>
           {autoPassBanner}
         </div>
       )}
-      <HUD player={enemy} isActive={!isActivePlayer} />
-      <div style={{ border: '1px solid rgba(80,20,20,0.4)', background: 'rgba(80,20,20,0.15)', borderRadius: 4, padding: '4px 6px 6px' }}>
-        <div style={{ fontSize: 11, color: '#c04040', fontVariant: 'small-caps', letterSpacing: '0.08em', marginBottom: 4 }}>Enemy Board</div>
-        <Board
-          board={enemy.board}
-          legalTargets={enemyLegalTargets}
-          selectedSlot={null}
-          onSlotClick={handleEnemySlotClick}
-          flipped={true}
-          companionInstanceId={enemy.companion.instanceId}
-          justEvolvedInstanceId={justEvolvedId}
-        />
-      </div>
-      <EventLog log={state.eventLog} />
-      <div style={{ padding: '4px 6px 6px' }}>
-        <div style={{ fontSize: 11, color: '#40a0c0', fontVariant: 'small-caps', letterSpacing: '0.08em', marginBottom: 4 }}>Your Board</div>
-        {evolutionBanner && (
+
+      {/* Centered content container */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '12px 16px 16px',
+        maxWidth: 896,
+        width: '100%',
+        margin: '0 auto',
+        position: 'relative',
+        zIndex: 1,
+      }}>
+        {/* Turn label bar */}
+        <div style={{
+          height: 32,
+          background: 'rgba(15,23,42,0.7)',
+          borderLeft: `3px solid ${turnBorderColor}`,
+          display: 'flex',
+          alignItems: 'center',
+          paddingLeft: 12,
+          boxSizing: 'border-box',
+          fontFamily: 'monospace',
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: turnColor,
+          letterSpacing: '0.05em',
+          borderRadius: '0 4px 4px 0',
+          marginBottom: 8,
+        }}>
+          {turnLabel}
+        </div>
+
+        {/* Enemy HUD */}
+        <HUD player={enemy} isActive={!isActivePlayer} />
+
+        {/* Enemy board */}
+        <div style={{ marginTop: 8 }}>
+          <Board
+            board={enemy.board}
+            legalTargets={enemyLegalTargets}
+            selectedSlot={null}
+            onSlotClick={handleEnemySlotClick}
+            flipped={true}
+            companionInstanceId={enemy.companion.instanceId}
+            justEvolvedInstanceId={justEvolvedId}
+          />
+        </div>
+
+        {/* Tactical Divide */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', margin: '12px 0' }}>
           <div style={{
-            textAlign: 'center',
-            background: '#1a1a1a',
-            color: '#f0c040',
+            flex: 1,
+            height: 1,
+            background: 'linear-gradient(to right, transparent, rgba(34,211,238,0.3), transparent)',
+          }} />
+          <div style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#020817',
+            padding: '0 10px',
+            fontSize: 10,
+            color: 'rgba(34,211,238,0.6)',
             fontFamily: 'monospace',
-            fontSize: 13,
-            fontWeight: 'bold',
-            letterSpacing: '0.08em',
-            padding: '6px 0',
-            marginBottom: 4,
-            borderRadius: 3,
+            letterSpacing: '0.15em',
+            whiteSpace: 'nowrap',
           }}>
-            {evolutionBanner}
+            TACTICAL DIVIDE
           </div>
-        )}
-        <Board
-          board={player.board}
-          legalTargets={playerLegalTargets}
-          selectedSlot={highlightedPlayerSlot}
-          onSlotClick={handlePlayerSlotClick}
-          flipped={false}
-          companionInstanceId={player.companion.instanceId}
-          justEvolvedInstanceId={justEvolvedId}
-        />
-      </div>
-      <div style={{ fontSize: 12, color: '#666', display: 'flex', gap: 6, alignItems: 'baseline' }}>
-        <span>Hand ({player.hand.length}/{GAME_CONSTANTS.HAND_SIZE_CAP})</span>
-        <span style={{ fontSize: 11, color: '#888' }}>
-          {selectedCardId !== null
-            ? '— Click a highlighted slot to play'
-            : selectedSlot !== null
-              ? '— Click an enemy to attack or an empty slot to move'
-              : '— Select a card to play or a unit to move/attack'}
-        </span>
-      </div>
-      <Hand hand={player.hand} selectedCardId={selectedCardId} onCardClick={handleCardClick} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <HUD player={player} isActive={isActivePlayer} />
-        <button onClick={handleEndTurn} style={{ padding: '6px 14px' }}>
-          End Turn
-        </button>
+        </div>
+
+        {/* Player board */}
+        <div>
+          {evolutionBanner && (
+            <div style={{
+              textAlign: 'center',
+              background: 'rgba(245,158,11,0.08)',
+              color: '#f59e0b',
+              fontFamily: 'monospace',
+              fontSize: 13,
+              fontWeight: 'bold',
+              letterSpacing: '0.08em',
+              padding: '6px 0',
+              marginBottom: 6,
+              borderRadius: 4,
+              border: '1px solid rgba(245,158,11,0.2)',
+            }}>
+              {evolutionBanner}
+            </div>
+          )}
+          <Board
+            board={player.board}
+            legalTargets={playerLegalTargets}
+            selectedSlot={highlightedPlayerSlot}
+            onSlotClick={handlePlayerSlotClick}
+            flipped={false}
+            companionInstanceId={player.companion.instanceId}
+            justEvolvedInstanceId={justEvolvedId}
+          />
+        </div>
+
+        {/* Hand section */}
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace', marginBottom: 8, letterSpacing: '0.04em' }}>
+            {selectedCardId !== null
+              ? '▶ Click a highlighted slot to play'
+              : selectedSlot !== null
+                ? '▶ Click an enemy to attack or an empty slot to move'
+                : `HAND ${player.hand.length}/${GAME_CONSTANTS.HAND_SIZE_CAP} — Select a card or unit`}
+          </div>
+          <Hand
+            hand={player.hand}
+            selectedCardId={selectedCardId}
+            onCardClick={handleCardClick}
+            deckCount={player.deck.length}
+          />
+        </div>
+
+        {/* Player HUD + End Turn */}
+        <div style={{ marginTop: 8, position: 'relative' }}>
+          <HUD player={player} isActive={isActivePlayer} />
+          <button
+            onClick={handleEndTurn}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#10b981'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#059669'; }}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              right: 12,
+              transform: 'translateY(-50%)',
+              background: '#059669',
+              color: '#fff',
+              fontWeight: 'bold',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              padding: '7px 18px',
+              borderRadius: 6,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 0 12px rgba(5,150,105,0.5)',
+              transition: 'background 150ms ease',
+            }}
+          >
+            End Turn
+          </button>
+        </div>
       </div>
     </div>
   );

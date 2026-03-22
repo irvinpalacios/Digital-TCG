@@ -2,99 +2,179 @@
 import React from 'react';
 import { getCardDefinition } from '../cards/registry';
 
-const CARD_TOOLTIPS: Record<string, string> = {
-  'pack-signal': 'Move 2 friendly units to empty adjacent slots. Free action.',
-  'pounce-window': 'Push enemy front unit back. If empty, draw 1 card.',
-  'sharpen-instinct': 'Give a unit +2 ATK this turn. +1 Charge if companion.',
+const CARD_TEXT: Record<string, string> = {
+  'pack-signal': 'Move 2 friendly units to empty adjacent slots.',
+  'pounce-window': 'Push enemy front unit back. If empty, draw 1.',
+  'sharpen-instinct': 'Give a unit +2 ATK. +1 Charge if companion.',
   'soul-kindle': 'Sacrifice a non-companion unit. Gain 3 Charge.',
-  'ember-mantle': 'Companion gains +2 HP, +1 ATK permanently. +1 Charge if Wisp.',
+  'ember-mantle': 'Companion gains +2 HP, +1 ATK. +1 Charge if Wisp.',
   'death-flare': 'Deal 2 damage to ALL units. Gain 1 Charge per death.',
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  Unit: '#4a8aff',
-  Companion: '#c040f0',
-  Spell: '#f04040',
-  Upgrade: '#40b040',
+  Unit: '#22d3ee',
+  Companion: '#22d3ee',
+  Spell: '#c084fc',
+  Upgrade: '#10b981',
 };
 
 type HandProps = {
   hand: CardInstance[];
   selectedCardId: string | null;
   onCardClick: (cardInstanceId: string) => void;
+  deckCount?: number;
 };
 
-export function Hand({ hand, selectedCardId, onCardClick }: HandProps) {
+export function Hand({ hand, selectedCardId, onCardClick, deckCount }: HandProps) {
   const [hoveredCardId, setHoveredCardId] = React.useState<string | null>(null);
 
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
       {hand.map((card) => {
         const def = getCardDefinition(card.definitionId);
         const isUnit = def?.type === 'Unit' || def?.type === 'Companion';
         const isSpellOrUpgrade = def?.type === 'Spell' || def?.type === 'Upgrade';
         const cost = (card as CardInstance & { cost?: number }).cost ?? def?.cost ?? '?';
-        const typeColor = def?.type ? (TYPE_COLORS[def.type] ?? '#888') : '#888';
-        const tooltip = isSpellOrUpgrade ? CARD_TOOLTIPS[card.definitionId] : null;
-        const showTooltip = hoveredCardId === card.instanceId && tooltip != null;
+        const typeColor = def?.type ? (TYPE_COLORS[def.type] ?? '#94a3b8') : '#94a3b8';
+        const cardText = isSpellOrUpgrade ? (CARD_TEXT[card.definitionId] ?? null) : null;
+        const isSelected = selectedCardId === card.instanceId;
+        const isHovered = hoveredCardId === card.instanceId;
+
+        const translateY = isSelected ? -16 : isHovered ? -8 : 0;
 
         return (
           <div
             key={card.instanceId}
-            style={{ position: 'relative' }}
+            onClick={() => onCardClick(card.instanceId)}
             onMouseEnter={() => setHoveredCardId(card.instanceId)}
             onMouseLeave={() => setHoveredCardId(null)}
+            style={{
+              width: 128,
+              height: 176,
+              borderRadius: 12,
+              background: '#0f172a',
+              border: isSelected
+                ? '2px solid #22d3ee'
+                : '2px solid #334155',
+              boxShadow: isSelected
+                ? '0 0 16px rgba(34,211,238,0.4), 0 0 4px rgba(34,211,238,0.2)'
+                : 'none',
+              cursor: 'pointer',
+              userSelect: 'none',
+              position: 'relative',
+              overflow: 'hidden',
+              flexShrink: 0,
+              transform: `translateY(${translateY}px)`,
+              transition: 'transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease',
+              display: 'flex',
+              flexDirection: 'column',
+              boxSizing: 'border-box',
+            }}
           >
-            {showTooltip && (
+            {/* Cost badge — top left corner */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              background: '#0c2a3a',
+              borderRight: '1px solid rgba(34,211,238,0.4)',
+              borderBottom: '1px solid rgba(34,211,238,0.4)',
+              borderBottomRightRadius: 8,
+              padding: '3px 7px 3px 5px',
+              zIndex: 2,
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 2,
+            }}>
+              <span style={{ fontSize: 10, color: '#22d3ee' }}>⚡</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 'bold', color: '#22d3ee' }}>{cost}</span>
+            </div>
+
+            {/* Art area — top half */}
+            <div style={{
+              height: 88,
+              background: '#1e293b',
+              borderBottom: '1px solid #334155',
+              backgroundImage: 'radial-gradient(circle, rgba(71,85,105,0.4) 1px, transparent 1px)',
+              backgroundSize: '10px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <span style={{ fontSize: 28, opacity: 0.25, color: '#94a3b8' }}>
+                {isUnit ? '↗' : '↑'}
+              </span>
+            </div>
+
+            {/* Info section — bottom half */}
+            <div style={{
+              flex: 1,
+              padding: '6px 8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 3,
+              overflow: 'hidden',
+            }}>
               <div style={{
-                position: 'absolute',
-                bottom: '110%',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: '#222',
-                color: '#eee',
-                border: '1px solid #555',
-                borderRadius: 4,
-                padding: '6px 8px',
                 fontSize: 11,
-                width: 160,
-                zIndex: 10,
-                pointerEvents: 'none',
-                textAlign: 'center',
+                fontWeight: 'bold',
+                color: '#f1f5f9',
+                lineHeight: 1.2,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}>
-                {tooltip}
+                {def?.name ?? card.instanceId}
               </div>
-            )}
-            <div
-              onClick={() => onCardClick(card.instanceId)}
-              style={{
-                width: 80,
-                height: 120,
-                border: '1px solid #333',
-                background: selectedCardId === card.instanceId ? 'yellow' : '#fff',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                userSelect: 'none',
-                fontSize: 12,
-                gap: 2,
-              }}
-            >
-              <div style={{ fontWeight: 'bold', textAlign: 'center', fontSize: 11, padding: '0 4px' }}>{def?.name ?? card.instanceId}</div>
-              <div style={{ color: '#f0c040', fontSize: 11 }}>Cost: {cost} ⚡</div>
-              <div style={{ color: typeColor, fontSize: 10 }}>{def?.type ?? '?'}</div>
+              <div style={{ fontSize: 10, color: typeColor, fontWeight: 600, letterSpacing: '0.04em' }}>
+                {def?.type ?? '?'}
+              </div>
               {isUnit && (
-                <>
-                  <div>HP: {card.currentHp}</div>
-                  <div>ATK: {card.currentAttack}</div>
-                </>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8' }}>🛡{card.currentHp}</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8' }}>⚡{card.currentAttack}</span>
+                </div>
+              )}
+              {cardText && (
+                <div style={{
+                  fontSize: 9,
+                  color: '#64748b',
+                  lineHeight: 1.4,
+                  marginTop: 2,
+                  overflow: 'hidden',
+                }}>
+                  {cardText}
+                </div>
               )}
             </div>
           </div>
         );
       })}
+
+      {/* Deck counter */}
+      {deckCount !== undefined && (
+        <div style={{
+          width: 80,
+          height: 112,
+          borderRadius: 8,
+          background: '#0f172a',
+          border: '1px solid #334155',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 4,
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 9, color: '#475569', fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            DECK
+          </span>
+          <span style={{ fontFamily: 'monospace', fontSize: 28, fontWeight: 'bold', color: '#22d3ee', lineHeight: 1 }}>
+            {deckCount}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

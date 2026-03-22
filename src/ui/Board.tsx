@@ -13,6 +13,8 @@ type BoardProps = {
 };
 
 export function Board({ board, legalTargets, selectedSlot, onSlotClick, flipped, companionInstanceId, justEvolvedInstanceId }: BoardProps) {
+  const isEnemy = flipped;
+
   const isLegalTarget = (pos: SlotPosition) =>
     legalTargets.some((t) => t.row === pos.row && t.index === pos.index);
 
@@ -20,9 +22,10 @@ export function Board({ board, legalTargets, selectedSlot, onSlotClick, flipped,
     selectedSlot !== null && selectedSlot.row === pos.row && selectedSlot.index === pos.index;
 
   const renderRow = (row: Row) => (
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 160px)', gap: 12 }}>
       {([0, 1, 2] as SlotIndex[]).map((index) => {
         const pos: SlotPosition = { row, index };
+        const frontSlotEmpty = row === 'back' ? board.front[index].occupant === null : false;
         return (
           <BoardSlot
             key={`${row}-${index}`}
@@ -32,6 +35,9 @@ export function Board({ board, legalTargets, selectedSlot, onSlotClick, flipped,
             onClick={() => onSlotClick(pos)}
             isCompanion={board[row][index].occupant?.instanceId === companionInstanceId}
             isJustEvolved={board[row][index].occupant?.instanceId === justEvolvedInstanceId}
+            isEnemy={isEnemy}
+            row={row}
+            frontSlotEmpty={frontSlotEmpty}
           />
         );
       })}
@@ -39,7 +45,7 @@ export function Board({ board, legalTargets, selectedSlot, onSlotClick, flipped,
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
       {flipped ? (
         <>
           {renderRow('back')}
