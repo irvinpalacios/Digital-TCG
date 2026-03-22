@@ -1,6 +1,7 @@
 /// <reference path="../state/types.ts" />
 import { GAME_CONSTANTS } from '../../config/gameConstants';
 import { getCardDefinitionOrThrow } from '../cards/registry';
+import { resolvePlayerName } from '../utils/logHelpers';
 
 export function startTurn(state: GameState): GameState {
   const updatedPlayers = state.players.map((player) => {
@@ -36,8 +37,8 @@ export function startTurn(state: GameState): GameState {
     players: updatedPlayers,
     eventLog: [
       ...state.eventLog,
-      `Turn ${state.turnNumber} started for ${state.activePlayerId}`,
-      ...(drawCount > 0 ? [`${state.activePlayerId} drew ${drawCount} card${drawCount !== 1 ? 's' : ''}.`] : []),
+      `Turn ${state.turnNumber} — ${resolvePlayerName(state.activePlayerId)}'s turn begins.`,
+      ...(drawCount > 0 ? [`${resolvePlayerName(state.activePlayerId)} drew ${drawCount} card${drawCount !== 1 ? 's' : ''}.`] : []),
     ],
   };
 
@@ -58,7 +59,7 @@ export function endTurn(state: GameState): GameState {
     turnNumber: state.turnNumber + 1,
     eventLog: [
       ...state.eventLog,
-      `Turn ended. Now player ${nextPlayerId}'s turn.`,
+      `Turn ${state.turnNumber} ended.`,
     ],
   };
 }
@@ -73,10 +74,11 @@ export function gainCharge(state: GameState, playerId: string, amount: number): 
         },
   ) as [PlayerState, PlayerState];
 
+  const newTotal = (state.players.find((p) => p.playerId === playerId)?.companion.charge ?? 0) + amount;
   return {
     ...state,
     players: updatedPlayers,
-    eventLog: [...state.eventLog, `${playerId} gained ${amount} charge.`],
+    eventLog: [...state.eventLog, `${resolvePlayerName(playerId)} gained ${amount} Charge (${newTotal} total).`],
   };
 }
 
@@ -101,6 +103,7 @@ export function checkCompanionEvolution(state: GameState, playerId: string): Gam
         ) as [Slot, Slot, Slot];
       return {
         ...p,
+        evolutionTurn: state.turnNumber,
         companion: {
           ...p.companion,
           currentHp: newHp,
@@ -115,7 +118,7 @@ export function checkCompanionEvolution(state: GameState, playerId: string): Gam
     return {
       ...state,
       players: updatedPlayers,
-      eventLog: [...state.eventLog, `${playerId}'s companion evolved into ${evolvedDef.name}!`],
+      eventLog: [...state.eventLog, `${resolvePlayerName(playerId)}'s ${getCardDefinitionOrThrow(companion.definitionId).name} evolved into ${evolvedDef.name}!`],
     };
   }
 

@@ -8,9 +8,11 @@ type BoardProps = {
   selectedSlot: SlotPosition | null;
   onSlotClick: (position: SlotPosition) => void;
   flipped: boolean;
+  companionInstanceId: string;
+  justEvolvedInstanceId?: string | null;
 };
 
-export function Board({ board, legalTargets, selectedSlot, onSlotClick, flipped }: BoardProps) {
+export function Board({ board, legalTargets, selectedSlot, onSlotClick, flipped, companionInstanceId, justEvolvedInstanceId }: BoardProps) {
   const isLegalTarget = (pos: SlotPosition) =>
     legalTargets.some((t) => t.row === pos.row && t.index === pos.index);
 
@@ -28,6 +30,8 @@ export function Board({ board, legalTargets, selectedSlot, onSlotClick, flipped 
             isLegalTarget={isLegalTarget(pos)}
             isSelected={isSelected(pos)}
             onClick={() => onSlotClick(pos)}
+            isCompanion={board[row][index].occupant?.instanceId === companionInstanceId}
+            isJustEvolved={board[row][index].occupant?.instanceId === justEvolvedInstanceId}
           />
         );
       })}

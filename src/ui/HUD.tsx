@@ -1,6 +1,7 @@
 /// <reference path="../state/types.ts" />
 import React from 'react';
 import { getCardDefinition } from '../cards/registry';
+import { GAME_CONSTANTS } from '../../config/gameConstants';
 
 type HUDProps = {
   player: PlayerState;
@@ -26,7 +27,23 @@ export function HUD({ player, isActive }: HUDProps) {
     <div style={style}>
       <span>{player.playerId}</span>
       <span>Energy: {player.energy}/{player.energyMax}</span>
-      <span>Actions: {player.actionsRemaining}</span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {Array.from({ length: GAME_CONSTANTS.ACTIONS_PER_TURN }, (_, i) => {
+          const filled = i < player.actionsRemaining;
+          return (
+            <span
+              key={i}
+              style={{
+                display: 'inline-block',
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: filled ? (isActive ? '#f0c040' : '#aaa') : '#444',
+              }}
+            />
+          );
+        })}
+      </span>
       <span>Deck: {player.deck.length}</span>
       <span>{companionName} — HP: {player.companion.currentHp} | Charge: {player.companion.charge}</span>
     </div>

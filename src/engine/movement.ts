@@ -2,6 +2,7 @@
 import { getLegalMoves } from '../rules/movement';
 import { spendAction } from './cardPlay';
 import { hasActionsRemaining } from '../rules/validation';
+import { resolveCardName, resolvePlayerName } from '../utils/logHelpers';
 
 export function resolveMove(
   state: GameState,
@@ -12,7 +13,7 @@ export function resolveMove(
   const player = state.players.find((p) => p.playerId === playerId)!;
 
   if (!hasActionsRemaining(player)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: ${playerId} has no actions remaining.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolvePlayerName(playerId)} has no actions remaining.`] };
   }
 
   const fromSlot = player.board[fromPosition.row][fromPosition.index];
@@ -20,7 +21,7 @@ export function resolveMove(
   if (fromSlot.occupant === null) {
     return {
       ...state,
-      eventLog: [...state.eventLog, `Warning: no unit at ${fromPosition.row}[${fromPosition.index}] for ${playerId}.`],
+      eventLog: [...state.eventLog, `⚠ No unit at that slot.`],
     };
   }
 
@@ -32,7 +33,7 @@ export function resolveMove(
   if (!isLegal) {
     return {
       ...state,
-      eventLog: [...state.eventLog, `Warning: move to ${toPosition.row}[${toPosition.index}] is not legal for ${playerId}.`],
+      eventLog: [...state.eventLog, `⚠ That move is not legal.`],
     };
   }
 
@@ -59,7 +60,7 @@ export function resolveMove(
     players: updatedPlayers,
     eventLog: [
       ...state.eventLog,
-      `${movedOccupant.instanceId} moved from ${fromPosition.row}[${fromPosition.index}] to ${toPosition.row}[${toPosition.index}] (${playerId}).`,
+      `${resolveCardName(movedOccupant.instanceId, state)} moved to ${toPosition.row} ${toPosition.index + 1}.`,
     ],
   };
 

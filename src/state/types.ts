@@ -51,6 +51,8 @@ type PlayerState = {
   energyMax: number;
   actionsRemaining: number;
   openingPlacements?: (FaceDownCard | null)[];
+  unitsLost: number;
+  evolutionTurn: number | null;
 };
 
 type GameState = {

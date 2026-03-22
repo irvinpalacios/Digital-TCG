@@ -31,6 +31,8 @@ export function createInitialPlayerState(playerId: string): PlayerState {
     energyMax: GAME_CONSTANTS.ENERGY_STARTING_MAX,
     actionsRemaining: GAME_CONSTANTS.ACTIONS_PER_TURN,
     companion: null as unknown as CompanionInstance, // wired in a later phase
+    unitsLost: 0,
+    evolutionTurn: null,
   };
 }
 

@@ -3,6 +3,7 @@ import { GAME_CONSTANTS } from '../../config/gameConstants';
 import { hasEnoughEnergy, hasActionsRemaining, isSlotEmpty } from '../rules/validation';
 import { getCardDefinition } from '../cards/registry';
 import { dealDamage, handleDeath } from './combat';
+import { resolveCardName, resolvePlayerName } from '../utils/logHelpers';
 
 function getCardDefinitionByInstance(card: CardInstance): CardDefinition | undefined {
   return getCardDefinition(card.definitionId);
@@ -39,16 +40,16 @@ export function playUnitCard(
   const card = active.hand.find((c) => c.instanceId === cardInstanceId) as CardInstanceWithCost | undefined;
 
   if (!card) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: card ${cardInstanceId} not found in hand.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ Card not found in hand.`] };
   }
   if (!hasActionsRemaining(active)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: ${active.playerId} has no actions remaining.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolvePlayerName(active.playerId)} has no actions remaining.`] };
   }
   if (!hasEnoughEnergy(active, card.cost)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: ${active.playerId} has insufficient energy to play ${card.instanceId}.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolvePlayerName(active.playerId)} has insufficient energy.`] };
   }
   if (!isSlotEmpty(active.board, targetSlot)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: target slot ${targetSlot.row}[${targetSlot.index}] is not empty.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ Target slot is not empty.`] };
   }
 
   const placedCard = { ...card, hasMovedThisTurn: false, hasAttackedThisTurn: false };
@@ -71,7 +72,7 @@ export function playUnitCard(
 
   return {
     ...next,
-    eventLog: [...next.eventLog, `${active.playerId} played ${card.instanceId} to ${targetSlot.row}[${targetSlot.index}].`],
+    eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} played ${getCardDefinitionByInstance(card)?.name ?? card.instanceId} to ${targetSlot.row} ${targetSlot.index + 1}.`],
   };
 }
 
@@ -80,13 +81,13 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
   const card = active.hand.find((c) => c.instanceId === cardInstanceId) as CardInstanceWithCost | undefined;
 
   if (!card) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: card ${cardInstanceId} not found in hand.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ Card not found in hand.`] };
   }
   if (!hasActionsRemaining(active)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: ${active.playerId} has no actions remaining.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolvePlayerName(active.playerId)} has no actions remaining.`] };
   }
   if (!hasEnoughEnergy(active, card.cost)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: ${active.playerId} has insufficient energy to play ${card.instanceId}.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolvePlayerName(active.playerId)} has insufficient energy.`] };
   }
 
   const def = getCardDefinitionByInstance(card);
@@ -99,7 +100,7 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
     let next = { ...state, players: removedPlayers };
     next = spendEnergy(next, active.playerId, card.cost);
     next = spendAction(next, active.playerId);
-    next = { ...next, eventLog: [...next.eventLog, `${active.playerId} played Death Flare — 2 damage to all units!`] };
+    next = { ...next, eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} played Death Flare — 2 damage to all units!`] };
 
     const rows: Row[] = ['front', 'back'];
     const indices: SlotIndex[] = [0, 1, 2];
@@ -136,7 +137,7 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
       next = {
         ...next,
         players: chargedPlayers,
-        eventLog: [...next.eventLog, `Death Flare killed ${deathCount} unit${deathCount !== 1 ? 's' : ''} — ${active.playerId} gained ${deathCount} Charge.`],
+        eventLog: [...next.eventLog, `Death Flare destroyed ${deathCount} unit${deathCount !== 1 ? 's' : ''} — ${resolvePlayerName(active.playerId)} gained ${deathCount} Charge.`],
       };
     }
 
@@ -155,7 +156,7 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
   if (def?.id === 'soul-kindle' && targetSlot) {
     const targetOccupant = active.board[targetSlot.row][targetSlot.index].occupant;
     if (!targetOccupant || targetOccupant.instanceId === active.companion.instanceId) {
-      return { ...state, eventLog: [...state.eventLog, `Warning: Soul Kindle requires a non-companion unit to sacrifice.`] };
+      return { ...state, eventLog: [...state.eventLog, `⚠ Soul Kindle requires a non-companion unit to sacrifice.`] };
     }
     const clearedPlayers = state.players.map((p) => {
       if (p.playerId !== active.playerId) return p;
@@ -172,17 +173,17 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
     let next = { ...state, players: clearedPlayers };
     next = spendEnergy(next, active.playerId, card.cost);
     next = spendAction(next, active.playerId);
-    return { ...next, eventLog: [...next.eventLog, `${active.playerId} sacrificed ${targetOccupant.instanceId} with Soul Kindle — gained 3 Charge.`] };
+    return { ...next, eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} sacrificed ${resolveCardName(targetOccupant.instanceId, state)} with Soul Kindle — gained 3 Charge.`] };
   }
 
   // Pack Signal: reposition a friendly unit to an adjacent empty slot
   if (def?.id === 'pack-signal' && sourceSlot && targetSlot) {
     const sourceOccupant = active.board[sourceSlot.row][sourceSlot.index].occupant;
     if (!sourceOccupant) {
-      return { ...state, eventLog: [...state.eventLog, `Warning: Pack Signal requires a unit at the source slot.`] };
+      return { ...state, eventLog: [...state.eventLog, `⚠ Pack Signal requires a unit at the source slot.`] };
     }
     if (!isSlotEmpty(active.board, targetSlot)) {
-      return { ...state, eventLog: [...state.eventLog, `Warning: Pack Signal target slot is not empty.`] };
+      return { ...state, eventLog: [...state.eventLog, `⚠ Pack Signal target slot is not empty.`] };
     }
     const repositionedPlayers = state.players.map((p) => {
       if (p.playerId !== active.playerId) return p;
@@ -202,22 +203,22 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
     let next = { ...state, players: repositionedPlayers };
     next = spendEnergy(next, active.playerId, card.cost);
     next = spendAction(next, active.playerId);
-    return { ...next, eventLog: [...next.eventLog, `${active.playerId} used Pack Signal — repositioned ${sourceOccupant.instanceId} to ${targetSlot.row}[${targetSlot.index}].`] };
+    return { ...next, eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} used Pack Signal — ${resolveCardName(sourceOccupant.instanceId, state)} moved to ${targetSlot.row} ${targetSlot.index + 1}.`] };
   }
 
   // Pounce Window: push an enemy front-row unit to the back row of the same lane
   if (def?.id === 'pounce-window' && targetSlot) {
     if (targetSlot.row !== 'front') {
-      return { ...state, eventLog: [...state.eventLog, `Warning: Pounce Window must target an enemy front-row unit.`] };
+      return { ...state, eventLog: [...state.eventLog, `⚠ Pounce Window must target an enemy front-row unit.`] };
     }
     const enemy = state.players.find((p) => p.playerId !== active.playerId)!;
     const targetOccupant = enemy.board.front[targetSlot.index].occupant;
     if (!targetOccupant) {
-      return { ...state, eventLog: [...state.eventLog, `Warning: Pounce Window target slot has no unit.`] };
+      return { ...state, eventLog: [...state.eventLog, `⚠ Pounce Window target slot has no unit.`] };
     }
     const backSlot: SlotPosition = { row: 'back', index: targetSlot.index };
     if (!isSlotEmpty(enemy.board, backSlot)) {
-      return { ...state, eventLog: [...state.eventLog, `Warning: Pounce Window cannot push — back slot ${targetSlot.index} is occupied.`] };
+      return { ...state, eventLog: [...state.eventLog, `⚠ Pounce Window cannot push — back lane ${targetSlot.index + 1} is occupied.`] };
     }
     const removedPlayers = state.players.map((p) =>
       p.playerId !== active.playerId ? p : { ...p, hand: p.hand.filter((c) => c.instanceId !== cardInstanceId) },
@@ -236,7 +237,7 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
       return { ...p, board: { front: newFront, back: newBack } };
     }) as [PlayerState, PlayerState];
     next = { ...next, players: pushedPlayers };
-    return { ...next, eventLog: [...next.eventLog, `${active.playerId} used Pounce Window — pushed ${targetOccupant.instanceId} to back row, lane ${targetSlot.index} is now open!`] };
+    return { ...next, eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} used Pounce Window — ${resolveCardName(targetOccupant.instanceId, state)} pushed to back row, lane ${targetSlot.index + 1} open!`] };
   }
 
   const updatedPlayers = state.players.map((p) =>
@@ -249,7 +250,7 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
 
   return {
     ...next,
-    eventLog: [...next.eventLog, `${active.playerId} played spell ${card.instanceId}. Effects pending.`],
+    eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} played ${def?.name ?? card.instanceId}. Effects pending.`],
   };
 }
 
@@ -262,13 +263,13 @@ export function playUpgradeCard(
   const card = active.hand.find((c) => c.instanceId === cardInstanceId) as CardInstanceWithCost | undefined;
 
   if (!card) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: card ${cardInstanceId} not found in hand.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ Card not found in hand.`] };
   }
   if (!hasActionsRemaining(active)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: ${active.playerId} has no actions remaining.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolvePlayerName(active.playerId)} has no actions remaining.`] };
   }
   if (!hasEnoughEnergy(active, card.cost)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: ${active.playerId} has insufficient energy to play ${card.instanceId}.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolvePlayerName(active.playerId)} has insufficient energy.`] };
   }
   const upgradeDef = getCardDefinitionByInstance(card);
 
@@ -311,12 +312,12 @@ export function playUpgradeCard(
 
     return {
       ...next,
-      eventLog: [...next.eventLog, `${active.playerId} equipped Ember Mantle — companion +2 HP, +1 ATK${isEmberWisp ? ', +1 Charge' : ''}.`],
+      eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} equipped Ember Mantle — companion +2 HP, +1 ATK${isEmberWisp ? ', +1 Charge' : ''}.`],
     };
   }
 
   if (isSlotEmpty(active.board, targetSlot)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: target slot ${targetSlot.row}[${targetSlot.index}] has no unit to attach upgrade to.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ Target slot has no unit to attach upgrade to.`] };
   }
 
   // Sharpen Instinct: +2 ATK to target unit
@@ -340,7 +341,7 @@ export function playUpgradeCard(
     next = spendAction(next, active.playerId);
     return {
       ...next,
-      eventLog: [...next.eventLog, `${active.playerId} equipped Sharpen Instinct on ${occupant?.instanceId ?? 'unit'} — +2 ATK.`],
+      eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} equipped Sharpen Instinct on ${occupant ? resolveCardName(occupant.instanceId, state) : 'unit'} — +2 ATK.`],
     };
   }
 
@@ -354,6 +355,6 @@ export function playUpgradeCard(
 
   return {
     ...next,
-    eventLog: [...next.eventLog, `${active.playerId} attached upgrade ${card.instanceId} to ${targetSlot.row}[${targetSlot.index}]. Effects pending.`],
+    eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} attached ${upgradeDef?.name ?? card.instanceId}. Effects pending.`],
   };
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { GameStateProvider, useGameState } from '../state/store';
 import { OpeningScreen } from './OpeningScreen';
 import { GameScreen } from './GameScreen';
+import { EndScreen } from './EndScreen';
 
 function GameRouter() {
   const { state } = useGameState();
@@ -11,12 +12,7 @@ function GameRouter() {
   }
 
   if (state.winner !== null || state.phase === 'ended') {
-    return (
-      <div style={{ fontFamily: 'monospace', padding: '40px', textAlign: 'center', background: '#111', color: '#eee', minHeight: '100vh' }}>
-        <h1>Game Over</h1>
-        <p style={{ fontSize: '20px', marginTop: '16px' }}>{state.winner} wins!</p>
-      </div>
-    );
+    return <EndScreen state={state} />;
   }
 
   return <GameScreen />;

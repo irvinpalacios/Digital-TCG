@@ -3,6 +3,7 @@ import { GAME_CONSTANTS } from '../../config/gameConstants';
 import { gainCharge } from './turnFlow';
 import { spendAction } from './cardPlay';
 import { hasActionsRemaining } from '../rules/validation';
+import { resolveCardName, resolvePlayerName } from '../utils/logHelpers';
 
 function getSlot(board: BoardState, position: SlotPosition): Slot {
   return board[position.row][position.index];
@@ -39,14 +40,14 @@ export function dealDamage(
 
   const targetPlayer = state.players.find((p) => p.playerId === targetPlayerId)!;
   const slot = getSlot(targetPlayer.board, targetPosition);
-  const occupantName = slot.occupant?.instanceId ?? 'unknown';
+  const occupantName = slot.occupant ? resolveCardName(slot.occupant.instanceId, state) : 'Unknown';
 
   return {
     ...state,
     players: updatedPlayers,
     eventLog: [
       ...state.eventLog,
-      `${occupantName} took ${amount} damage (${targetPlayerId}, ${targetPosition.row}[${targetPosition.index}]).`,
+      `${occupantName} took ${amount} damage.`,
     ],
   };
 }
@@ -63,18 +64,24 @@ export function handleDeath(
 
   const chargeKeyword = occupant.keywords.find((k) => k.keyword === 'Charge');
 
+  const isCompanionDeath = occupant.instanceId === player.companion.instanceId;
+
   const clearedPlayers = state.players.map((p) => {
     if (p.playerId !== playerId) return p;
     const updatedRow = p.board[position.row].map((s, i) =>
       i === position.index ? { ...s, occupant: null } : s,
     ) as [Slot, Slot, Slot];
-    return { ...p, board: { ...p.board, [position.row]: updatedRow } };
+    return {
+      ...p,
+      board: { ...p.board, [position.row]: updatedRow },
+      unitsLost: isCompanionDeath ? p.unitsLost : p.unitsLost + 1,
+    };
   }) as [PlayerState, PlayerState];
 
   let next: GameState = {
     ...state,
     players: clearedPlayers,
-    eventLog: [...state.eventLog, `${occupant.instanceId} died (${playerId}, ${position.row}[${position.index}]).`],
+    eventLog: [...state.eventLog, `${resolveCardName(occupant.instanceId, state)} was destroyed.`],
   };
 
   if (chargeKeyword?.value !== undefined) {
@@ -94,7 +101,7 @@ export function resolveAttack(
   const attackerPlayer = state.players.find((p) => p.playerId === attackerPlayerId)!;
 
   if (!hasActionsRemaining(attackerPlayer)) {
-    return { ...state, eventLog: [...state.eventLog, `Warning: ${attackerPlayerId} has no actions remaining.`] };
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolvePlayerName(attackerPlayerId)} has no actions remaining.`] };
   }
 
   const attacker = getSlot(attackerPlayer.board, attackerPosition).occupant;
@@ -131,7 +138,7 @@ export function resolveAttack(
     players: markedPlayers,
     eventLog: [
       ...next.eventLog,
-      `${attacker.instanceId} attacked ${targetOccupant?.instanceId ?? 'empty'} for ${attacker.currentAttack}.`,
+      `${resolveCardName(attacker.instanceId, state)} attacked ${targetOccupant ? resolveCardName(targetOccupant.instanceId, state) : 'empty slot'} for ${attacker.currentAttack} damage.`,
     ],
   };
 

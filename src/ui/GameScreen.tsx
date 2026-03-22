@@ -9,6 +9,7 @@ import { getLegalTargets } from '../rules/targeting';
 import { getLegalPlaySlots } from '../rules/validation';
 import { getLegalMoves } from '../rules/movement';
 import { GAME_CONSTANTS } from '../../config/gameConstants';
+import { getCardDefinition } from '../cards/registry';
 
 function findCompanionSlot(board: BoardState, companionInstanceId: string): SlotPosition | null {
   const rows: Row[] = ['front', 'back'];
@@ -41,6 +42,11 @@ export function GameScreen() {
   const [selectedSlot, setSelectedSlot] = React.useState<SlotPosition | null>(null);
   const [packSignalSource, setPackSignalSource] = React.useState<SlotPosition | null>(null);
   const [autoPassBanner, setAutoPassBanner] = React.useState<string | null>(null);
+  const [turnOverlay, setTurnOverlay] = React.useState<string | null>(null);
+  const isFirstRender = React.useRef(true);
+  const [evolutionBanner, setEvolutionBanner] = React.useState<string | null>(null);
+  const [justEvolvedId, setJustEvolvedId] = React.useState<string | null>(null);
+  const prevEvolutionStages = React.useRef<Record<string, number>>({});
 
   const player = state.players.find((p) => p.playerId === state.activePlayerId)!;
   const enemy = state.players.find((p) => p.playerId !== state.activePlayerId)!;
@@ -93,6 +99,17 @@ export function GameScreen() {
   })();
 
   React.useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const n = state.activePlayerId.replace('player-', '');
+    setTurnOverlay(`PLAYER ${n}'S TURN`);
+    const timer = setTimeout(() => setTurnOverlay(null), 1500);
+    return () => clearTimeout(timer);
+  }, [state.activePlayerId]);
+
+  React.useEffect(() => {
     if (state.phase !== 'main') return;
     if (player.actionsRemaining <= 0) {
       setAutoPassBanner('No actions remaining — passing turn automatically...');
@@ -106,6 +123,26 @@ export function GameScreen() {
       return () => clearTimeout(timer);
     }
   }, [player.actionsRemaining, state.activePlayerId]);
+
+  React.useEffect(() => {
+    let evolvedPlayerId: string | null = null;
+    let evolvedCompanionInstanceId: string | null = null;
+    let evolvedName: string | null = null;
+    for (const p of state.players) {
+      const prev = prevEvolutionStages.current[p.playerId] ?? 1;
+      if (prev === 1 && p.companion.evolutionStage === 2) {
+        evolvedPlayerId = p.playerId;
+        evolvedCompanionInstanceId = p.companion.instanceId;
+        evolvedName = getCardDefinition(p.companion.evolutionDefinitionId)?.name ?? p.companion.evolutionDefinitionId;
+      }
+      prevEvolutionStages.current[p.playerId] = p.companion.evolutionStage;
+    }
+    if (evolvedPlayerId === null) return;
+    setEvolutionBanner(`★ ${evolvedName} HAS EVOLVED ★`);
+    setJustEvolvedId(evolvedCompanionInstanceId);
+    const timer = setTimeout(() => { setEvolutionBanner(null); setJustEvolvedId(null); }, 2000);
+    return () => clearTimeout(timer);
+  }, [state.players[0].companion.evolutionStage, state.players[1].companion.evolutionStage]);
 
   function handleCardClick(cardInstanceId: string) {
     if (selectedCardId === cardInstanceId) {
@@ -200,8 +237,46 @@ export function GameScreen() {
   const isActivePlayer = true;
   const highlightedPlayerSlot = packSignalSource ?? selectedSlot;
 
+  const activePlayerNumber = state.activePlayerId.replace('player-', '');
+  const turnLabel = isActivePlayer
+    ? `YOUR TURN — Player ${activePlayerNumber}`
+    : `PLAYER ${activePlayerNumber}'S TURN`;
+  const turnColor = isActivePlayer ? '#f0c040' : '#888';
+  const turnBorderColor = isActivePlayer ? '#f0c040' : '#444';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, maxWidth: 420 }}>
+      <div style={{
+        marginLeft: -16,
+        marginRight: -16,
+        marginTop: -16,
+        height: 36,
+        background: '#1a1a1a',
+        borderLeft: `4px solid ${turnBorderColor}`,
+        display: 'flex',
+        alignItems: 'center',
+        paddingLeft: 12,
+        boxSizing: 'border-box',
+        fontFamily: 'monospace',
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: turnColor,
+        letterSpacing: '0.05em',
+      }}>
+        {turnLabel}
+      </div>
+      {turnOverlay && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 200,
+          fontFamily: 'monospace', fontSize: 28, fontWeight: 'bold',
+          color: '#f0c040', letterSpacing: '0.1em',
+        }}>
+          {turnOverlay}
+        </div>
+      )}
       {autoPassBanner && (
         <div style={{
           position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
@@ -213,22 +288,57 @@ export function GameScreen() {
         </div>
       )}
       <HUD player={enemy} isActive={!isActivePlayer} />
-      <Board
-        board={enemy.board}
-        legalTargets={enemyLegalTargets}
-        selectedSlot={null}
-        onSlotClick={handleEnemySlotClick}
-        flipped={true}
-      />
+      <div style={{ border: '1px solid rgba(80,20,20,0.4)', background: 'rgba(80,20,20,0.15)', borderRadius: 4, padding: '4px 6px 6px' }}>
+        <div style={{ fontSize: 11, color: '#c04040', fontVariant: 'small-caps', letterSpacing: '0.08em', marginBottom: 4 }}>Enemy Board</div>
+        <Board
+          board={enemy.board}
+          legalTargets={enemyLegalTargets}
+          selectedSlot={null}
+          onSlotClick={handleEnemySlotClick}
+          flipped={true}
+          companionInstanceId={enemy.companion.instanceId}
+          justEvolvedInstanceId={justEvolvedId}
+        />
+      </div>
       <EventLog log={state.eventLog} />
-      <Board
-        board={player.board}
-        legalTargets={playerLegalTargets}
-        selectedSlot={highlightedPlayerSlot}
-        onSlotClick={handlePlayerSlotClick}
-        flipped={false}
-      />
-      <div style={{ fontSize: 12, color: '#666' }}>Hand ({player.hand.length}/{GAME_CONSTANTS.HAND_SIZE_CAP})</div>
+      <div style={{ padding: '4px 6px 6px' }}>
+        <div style={{ fontSize: 11, color: '#40a0c0', fontVariant: 'small-caps', letterSpacing: '0.08em', marginBottom: 4 }}>Your Board</div>
+        {evolutionBanner && (
+          <div style={{
+            textAlign: 'center',
+            background: '#1a1a1a',
+            color: '#f0c040',
+            fontFamily: 'monospace',
+            fontSize: 13,
+            fontWeight: 'bold',
+            letterSpacing: '0.08em',
+            padding: '6px 0',
+            marginBottom: 4,
+            borderRadius: 3,
+          }}>
+            {evolutionBanner}
+          </div>
+        )}
+        <Board
+          board={player.board}
+          legalTargets={playerLegalTargets}
+          selectedSlot={highlightedPlayerSlot}
+          onSlotClick={handlePlayerSlotClick}
+          flipped={false}
+          companionInstanceId={player.companion.instanceId}
+          justEvolvedInstanceId={justEvolvedId}
+        />
+      </div>
+      <div style={{ fontSize: 12, color: '#666', display: 'flex', gap: 6, alignItems: 'baseline' }}>
+        <span>Hand ({player.hand.length}/{GAME_CONSTANTS.HAND_SIZE_CAP})</span>
+        <span style={{ fontSize: 11, color: '#888' }}>
+          {selectedCardId !== null
+            ? '— Click a highlighted slot to play'
+            : selectedSlot !== null
+              ? '— Click an enemy to attack or an empty slot to move'
+              : '— Select a card to play or a unit to move/attack'}
+        </span>
+      </div>
       <Hand hand={player.hand} selectedCardId={selectedCardId} onCardClick={handleCardClick} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <HUD player={player} isActive={isActivePlayer} />
