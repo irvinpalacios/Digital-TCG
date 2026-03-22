@@ -1,17 +1,13 @@
 /// <reference path="../state/types.ts" />
 import React from 'react';
 import { getCardDefinition } from '../cards/registry';
+import { getCompanionDisplayName } from '../utils/logHelpers';
 
 type EndScreenProps = {
   state: GameState;
 };
 
-function companionDisplayName(companion: CompanionInstance): string {
-  if (companion.evolutionStage === 2) {
-    return getCardDefinition(companion.evolutionDefinitionId)?.name ?? companion.evolutionDefinitionId;
-  }
-  return getCardDefinition(companion.definitionId)?.name ?? companion.definitionId;
-}
+const companionDisplayName = getCompanionDisplayName;
 
 function maxHpForCompanion(companion: CompanionInstance): number {
   if (companion.evolutionStage === 2) {

@@ -94,6 +94,7 @@ export function revealOpeningBoards(state: GameState): GameState {
         keywords: def.keywords,
         hasAttackedThisTurn: false,
         hasMovedThisTurn: false,
+        cost: def.cost,
       };
     };
 

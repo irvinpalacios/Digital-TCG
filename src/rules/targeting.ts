@@ -25,7 +25,7 @@ export function getLegalTargets(
   const attackerRow = attackerPosition.row;
   const attackerIndex = attackerPosition.index;
   const attackerOccupant = attackerBoard[attackerRow][attackerIndex].occupant;
-  if (attackerOccupant === null) return [];
+  if (attackerOccupant === null || attackerOccupant.hasAttackedThisTurn) return [];
 
   const isRanged = attackerOccupant.keywords.some((k) => k.keyword === 'Ranged');
 

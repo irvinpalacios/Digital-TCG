@@ -1,6 +1,6 @@
 /// <reference path="../state/types.ts" />
 import React from 'react';
-import { getCardDefinition } from '../cards/registry';
+import { getCompanionDisplayName } from '../utils/logHelpers';
 import { GAME_CONSTANTS } from '../../config/gameConstants';
 
 type HUDProps = {
@@ -9,8 +9,7 @@ type HUDProps = {
 };
 
 export function HUD({ player, isActive }: HUDProps) {
-  const companionName =
-    getCardDefinition(player.companion.definitionId)?.name ?? player.companion.instanceId;
+  const companionName = getCompanionDisplayName(player.companion);
 
   const threshold = player.companion.evolutionChargeThreshold;
   const chargeCount = Math.min(player.companion.charge, threshold);

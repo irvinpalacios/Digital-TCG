@@ -28,6 +28,7 @@ type CardInstance = {
   keywords: KeywordInstance[];
   hasAttackedThisTurn: boolean;
   hasMovedThisTurn: boolean;
+  cost: number;
 };
 
 type CompanionInstance = CardInstance & {

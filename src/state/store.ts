@@ -76,7 +76,7 @@ function buildDeckInstances(deckConfig: DeckConfig, ownerId: string): CardInstan
       hasAttackedThisTurn: false,
       hasMovedThisTurn: false,
       cost: def.cost,
-    } as CardInstance & { cost: number };
+    };
   });
 }
 
@@ -96,7 +96,7 @@ function buildCompanionInstance(deckConfig: DeckConfig, ownerId: string): Compan
     evolutionDefinitionId: def.evolutionTarget ?? '',
     evolutionChargeThreshold: def.evolutionChargeThreshold ?? Infinity,
     cost: 0,
-  } as CompanionInstance & { cost: number };
+  };
 }
 
 const base = createInitialGameState('player-1', 'player-2');

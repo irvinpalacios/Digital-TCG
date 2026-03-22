@@ -442,7 +442,10 @@ export function GameScreen() {
             {selectedCardId !== null
               ? '▶ Click a highlighted slot to play'
               : selectedSlot !== null
-                ? '▶ Click an enemy to attack or an empty slot to move'
+                ? (getLegalTargets(selectedSlot, player.board, enemy.board).length === 0 &&
+                   getLegalMoves(selectedSlot, player.board).length === 0)
+                  ? '▶ This unit has already acted this turn.'
+                  : '▶ Click an enemy to attack or an empty slot to move'
                 : `HAND ${player.hand.length}/${GAME_CONSTANTS.HAND_SIZE_CAP} — Select a card or unit`}
           </div>
           <Hand

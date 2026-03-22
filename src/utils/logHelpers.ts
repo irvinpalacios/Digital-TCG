@@ -41,3 +41,10 @@ export function resolvePlayerName(playerId: string): string {
   if (playerId === 'player-2') return 'Player 2';
   return playerId;
 }
+
+export function getCompanionDisplayName(companion: CompanionInstance): string {
+  if (companion.evolutionStage === 2) {
+    return getCardDefinition(companion.evolutionDefinitionId)?.name ?? companion.instanceId;
+  }
+  return getCardDefinition(companion.definitionId)?.name ?? companion.instanceId;
+}

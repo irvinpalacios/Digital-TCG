@@ -22,6 +22,8 @@ export function getAdjacentSlots(position: SlotPosition): SlotPosition[] {
 }
 
 export function getLegalMoves(position: SlotPosition, board: BoardState): SlotPosition[] {
+  const occupant = board[position.row][position.index].occupant;
+  if (occupant === null || occupant.hasMovedThisTurn) return [];
   return getAdjacentSlots(position).filter((pos) => {
     const slot = board[pos.row][pos.index];
     return slot.occupant === null;

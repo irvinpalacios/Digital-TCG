@@ -88,6 +88,18 @@ export function handleDeath(
     next = gainCharge(next, playerId, chargeKeyword.value);
   }
 
+  if (!isCompanionDeath) {
+    for (const p of next.players) {
+      if (p.companion.definitionId === 'ember-wisp' && p.playerId === playerId) {
+        next = gainCharge(next, p.playerId, 1);
+        next = {
+          ...next,
+          eventLog: [...next.eventLog, `Ember Wisp's Soul Siphon — gained 1 Charge.`],
+        };
+      }
+    }
+  }
+
   return next;
 }
 

@@ -27,9 +27,6 @@ export function spendAction(state: GameState, playerId: string): GameState {
   return { ...state, players: updatedPlayers };
 }
 
-// Note: cost is on CardDefinition, not CardInstance. Until definition lookups are wired,
-// cost is read via type assertion from the instance.
-type CardInstanceWithCost = CardInstance & { cost: number };
 
 export function playUnitCard(
   state: GameState,
@@ -37,7 +34,7 @@ export function playUnitCard(
   targetSlot: SlotPosition,
 ): GameState {
   const active = getActivePlayer(state);
-  const card = active.hand.find((c) => c.instanceId === cardInstanceId) as CardInstanceWithCost | undefined;
+  const card = active.hand.find((c) => c.instanceId === cardInstanceId);
 
   if (!card) {
     return { ...state, eventLog: [...state.eventLog, `⚠ Card not found in hand.`] };
@@ -78,7 +75,7 @@ export function playUnitCard(
 
 export function playSpellCard(state: GameState, cardInstanceId: string, targetSlot?: SlotPosition, sourceSlot?: SlotPosition): GameState {
   const active = getActivePlayer(state);
-  const card = active.hand.find((c) => c.instanceId === cardInstanceId) as CardInstanceWithCost | undefined;
+  const card = active.hand.find((c) => c.instanceId === cardInstanceId);
 
   if (!card) {
     return { ...state, eventLog: [...state.eventLog, `⚠ Card not found in hand.`] };
@@ -158,19 +155,27 @@ export function playSpellCard(state: GameState, cardInstanceId: string, targetSl
     if (!targetOccupant || targetOccupant.instanceId === active.companion.instanceId) {
       return { ...state, eventLog: [...state.eventLog, `⚠ Soul Kindle requires a non-companion unit to sacrifice.`] };
     }
-    const clearedPlayers = state.players.map((p) => {
+    // Step 1: Remove spell from hand, set sacrificed unit HP to 0 so handleDeath fires
+    const preparedPlayers = state.players.map((p) => {
       if (p.playerId !== active.playerId) return p;
       const updatedRow = p.board[targetSlot.row].map((s, i) =>
-        i === targetSlot.index ? { ...s, occupant: null } : s,
+        i === targetSlot.index && s.occupant ? { ...s, occupant: { ...s.occupant, currentHp: 0 } } : s,
       ) as [Slot, Slot, Slot];
       return {
         ...p,
         hand: p.hand.filter((c) => c.instanceId !== cardInstanceId),
         board: { ...p.board, [targetSlot.row]: updatedRow },
-        companion: { ...p.companion, charge: p.companion.charge + 3 },
       };
     }) as [PlayerState, PlayerState];
-    let next = { ...state, players: clearedPlayers };
+    let next: GameState = { ...state, players: preparedPlayers };
+    // Step 2: handleDeath clears the slot, fires Charge keyword, triggers Soul Siphon
+    next = handleDeath(next, active.playerId, targetSlot);
+    // Step 3: Grant the 3 Charge from Soul Kindle itself
+    const chargedPlayers = next.players.map((p) =>
+      p.playerId !== active.playerId ? p :
+      { ...p, companion: { ...p.companion, charge: p.companion.charge + 3 } },
+    ) as [PlayerState, PlayerState];
+    next = { ...next, players: chargedPlayers };
     next = spendEnergy(next, active.playerId, card.cost);
     next = spendAction(next, active.playerId);
     return { ...next, eventLog: [...next.eventLog, `${resolvePlayerName(active.playerId)} sacrificed ${resolveCardName(targetOccupant.instanceId, state)} with Soul Kindle — gained 3 Charge.`] };
@@ -260,7 +265,7 @@ export function playUpgradeCard(
   targetSlot: SlotPosition,
 ): GameState {
   const active = getActivePlayer(state);
-  const card = active.hand.find((c) => c.instanceId === cardInstanceId) as CardInstanceWithCost | undefined;
+  const card = active.hand.find((c) => c.instanceId === cardInstanceId);
 
   if (!card) {
     return { ...state, eventLog: [...state.eventLog, `⚠ Card not found in hand.`] };
