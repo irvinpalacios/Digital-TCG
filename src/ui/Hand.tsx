@@ -2,14 +2,7 @@
 import React from 'react';
 import { getCardDefinition } from '../cards/registry';
 
-const CARD_TEXT: Record<string, string> = {
-  'pack-signal': 'Move 2 friendly units to empty adjacent slots.',
-  'pounce-window': 'Push enemy front unit back. If empty, draw 1.',
-  'sharpen-instinct': 'Give a unit +2 ATK. +1 Charge if companion.',
-  'soul-kindle': 'Sacrifice a non-companion unit. Gain 3 Charge.',
-  'ember-mantle': 'Companion gains +2 HP, +1 ATK. +1 Charge if Wisp.',
-  'death-flare': 'Deal 2 damage to ALL units. Gain 1 Charge per death.',
-};
+const CARD_TEXT: Record<string, string> = {};
 
 const TYPE_COLORS: Record<string, string> = {
   Unit: '#22d3ee',

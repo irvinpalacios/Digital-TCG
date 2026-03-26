@@ -11,6 +11,22 @@ import { getLegalMoves } from '../rules/movement';
 import { GAME_CONSTANTS } from '../../config/gameConstants';
 import { getCardDefinition } from '../cards/registry';
 
+
+type AbilityInfo = { id: string; label: string; needsTarget: boolean; energyCost: number };
+
+function getActiveAbility(companion: CompanionInstance, actionsRemaining: number, energy: number): (AbilityInfo & { canUse: boolean }) | null {
+  if (companion.evolutionStage !== 2) return null;
+  let info: AbilityInfo | null = null;
+  if (companion.definitionId === 'caelum-voss')
+    info = { id: 'unwound-hour', label: 'Unwound Hour', needsTarget: true, energyCost: 0 };
+  else if (companion.definitionId === 'seravine-null')
+    info = { id: 'null-codex', label: 'Null Codex', needsTarget: false, energyCost: 1 };
+  else if (companion.definitionId === 'xochitl-pavon')
+    info = { id: 'xochiyaoyotl', label: 'Xochiyaoyotl', needsTarget: true, energyCost: 0 };
+  if (!info) return null;
+  return { ...info, canUse: actionsRemaining > 0 && energy >= info.energyCost };
+}
+
 function findCompanionSlot(board: BoardState, companionInstanceId: string): SlotPosition | null {
   const rows: Row[] = ['front', 'back'];
   const indices: SlotIndex[] = [0, 1, 2];
@@ -24,23 +40,11 @@ function findCompanionSlot(board: BoardState, companionInstanceId: string): Slot
   return null;
 }
 
-function getOccupiedSlots(board: BoardState): SlotPosition[] {
-  const rows: Row[] = ['front', 'back'];
-  const indices: SlotIndex[] = [0, 1, 2];
-  const result: SlotPosition[] = [];
-  for (const row of rows) {
-    for (const index of indices) {
-      if (board[row][index].occupant !== null) result.push({ row, index });
-    }
-  }
-  return result;
-}
-
 export function GameScreen() {
   const { state, dispatch } = useGameState();
   const [selectedCardId, setSelectedCardId] = React.useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = React.useState<SlotPosition | null>(null);
-  const [packSignalSource, setPackSignalSource] = React.useState<SlotPosition | null>(null);
+  const [pendingAbility, setPendingAbility] = React.useState<string | null>(null);
   const [autoPassBanner, setAutoPassBanner] = React.useState<string | null>(null);
   const [turnOverlay, setTurnOverlay] = React.useState<string | null>(null);
   const isFirstRender = React.useRef(true);
@@ -55,42 +59,20 @@ export function GameScreen() {
     ? player.hand.find((c) => c.instanceId === selectedCardId) ?? null
     : null;
 
-  const isDeathFlare = selectedCard?.definitionId === 'death-flare';
-  const isPackSignal = selectedCard?.definitionId === 'pack-signal';
-  const isPounceWindow = selectedCard?.definitionId === 'pounce-window';
-  const isEmberMantle = selectedCard?.definitionId === 'ember-mantle';
-  const isSharpenInstinct = selectedCard?.definitionId === 'sharpen-instinct';
-
   const playerLegalTargets: SlotPosition[] = (() => {
     if (selectedCard === null) {
       return selectedSlot !== null ? getLegalMoves(selectedSlot, player.board) : [];
-    }
-    if (isDeathFlare || isPounceWindow) return [];
-    if (isPackSignal) {
-      return packSignalSource === null
-        ? getOccupiedSlots(player.board)
-        : getLegalMoves(packSignalSource, player.board);
-    }
-    if (isEmberMantle) {
-      const companionSlot = findCompanionSlot(player.board, player.companion.instanceId);
-      return companionSlot ? [companionSlot] : [];
-    }
-    if (isSharpenInstinct) {
-      return getOccupiedSlots(player.board);
     }
     return getLegalPlaySlots(selectedCard, player.board);
   })();
 
   const enemyLegalTargets: SlotPosition[] = (() => {
-    if (isDeathFlare) {
-      return (['front', 'back'] as const).flatMap((row) =>
-        ([0, 1, 2] as const).map((index) => ({ row, index })),
+    if (pendingAbility !== null) {
+      const rows: Row[] = ['front', 'back'];
+      const indices: SlotIndex[] = [0, 1, 2];
+      return rows.flatMap((row) =>
+        indices.filter((i) => enemy.board[row][i].occupant !== null).map((i) => ({ row, index: i })),
       );
-    }
-    if (isPounceWindow) {
-      return ([0, 1, 2] as const)
-        .filter((i) => enemy.board.front[i].occupant !== null && enemy.board.back[i].occupant === null)
-        .map((i) => ({ row: 'front' as Row, index: i as SlotIndex }));
     }
     if (selectedSlot !== null) {
       return getLegalTargets(selectedSlot, player.board, enemy.board);
@@ -118,7 +100,6 @@ export function GameScreen() {
         setAutoPassBanner(null);
         setSelectedCardId(null);
         setSelectedSlot(null);
-        setPackSignalSource(null);
       }, 1200);
       return () => clearTimeout(timer);
     }
@@ -145,56 +126,26 @@ export function GameScreen() {
   }, [state.players[0].companion.evolutionStage, state.players[1].companion.evolutionStage]);
 
   function handleCardClick(cardInstanceId: string) {
+    setPendingAbility(null);
     if (selectedCardId === cardInstanceId) {
       setSelectedCardId(null);
-      setPackSignalSource(null);
     } else {
       setSelectedCardId(cardInstanceId);
       setSelectedSlot(null);
-      setPackSignalSource(null);
     }
   }
 
   function handlePlayerSlotClick(pos: SlotPosition) {
-    // Pack Signal: two-step — pick source unit, then pick destination
-    if (isPackSignal) {
-      if (packSignalSource === null) {
-        if (player.board[pos.row][pos.index].occupant !== null) {
-          setPackSignalSource(pos);
-        }
-      } else if (packSignalSource.row === pos.row && packSignalSource.index === pos.index) {
-        setPackSignalSource(null);
-      } else if (player.board[pos.row][pos.index].occupant === null) {
-        dispatch({ type: 'PLAY_CARD', cardInstanceId: selectedCardId!, targetSlot: pos, sourceSlot: packSignalSource });
-        setSelectedCardId(null);
-        setPackSignalSource(null);
-        setSelectedSlot(null);
-      } else {
-        setPackSignalSource(pos);
-      }
+    if (pendingAbility !== null) {
+      setPendingAbility(null);
       return;
     }
-
-    // Ember Mantle: only respond to companion slot click
-    if (isEmberMantle) {
-      const companionSlot = findCompanionSlot(player.board, player.companion.instanceId);
-      if (companionSlot && companionSlot.row === pos.row && companionSlot.index === pos.index) {
-        dispatch({ type: 'PLAY_CARD', cardInstanceId: selectedCardId!, targetSlot: pos });
-        setSelectedCardId(null);
-        setSelectedSlot(null);
-      }
-      return;
-    }
-
-    // All other card plays: dispatch on any slot click
     if (selectedCardId !== null) {
       dispatch({ type: 'PLAY_CARD', cardInstanceId: selectedCardId, targetSlot: pos });
       setSelectedCardId(null);
       setSelectedSlot(null);
       return;
     }
-
-    // No card selected: movement / slot selection
     if (selectedSlot && selectedSlot.row === pos.row && selectedSlot.index === pos.index) {
       setSelectedSlot(null);
       return;
@@ -214,10 +165,14 @@ export function GameScreen() {
   }
 
   function handleEnemySlotClick(pos: SlotPosition) {
-    if (selectedCardId !== null && (isDeathFlare || isPounceWindow)) {
-      dispatch({ type: 'PLAY_CARD', cardInstanceId: selectedCardId, targetSlot: pos });
-      setSelectedCardId(null);
+    if (pendingAbility !== null) {
+      const sourceSlot = findCompanionSlot(player.board, player.companion.instanceId);
+      if (sourceSlot) {
+        dispatch({ type: 'ACTIVATE_ABILITY', sourceSlot, abilityId: pendingAbility, targetSlot: pos });
+      }
+      setPendingAbility(null);
       setSelectedSlot(null);
+      setSelectedCardId(null);
       return;
     }
     if (selectedSlot !== null) {
@@ -228,14 +183,15 @@ export function GameScreen() {
   }
 
   function handleEndTurn() {
+    setPendingAbility(null);
     dispatch({ type: 'END_TURN' });
     setSelectedCardId(null);
     setSelectedSlot(null);
-    setPackSignalSource(null);
   }
 
   const isActivePlayer = true;
-  const highlightedPlayerSlot = packSignalSource ?? selectedSlot;
+  const highlightedPlayerSlot = selectedSlot;
+  const activeAbility = getActiveAbility(player.companion, player.actionsRemaining, player.energy);
 
   const activePlayerNumber = state.activePlayerId.replace('player-', '');
   const turnLabel = isActivePlayer
@@ -438,15 +394,55 @@ export function GameScreen() {
 
         {/* Hand section */}
         <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace', marginBottom: 8, letterSpacing: '0.04em' }}>
-            {selectedCardId !== null
-              ? '▶ Click a highlighted slot to play'
-              : selectedSlot !== null
-                ? (getLegalTargets(selectedSlot, player.board, enemy.board).length === 0 &&
-                   getLegalMoves(selectedSlot, player.board).length === 0)
-                  ? '▶ This unit has already acted this turn.'
-                  : '▶ Click an enemy to attack or an empty slot to move'
-                : `HAND ${player.hand.length}/${GAME_CONSTANTS.HAND_SIZE_CAP} — Select a card or unit`}
+          <div style={{ fontFamily: 'monospace', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontSize: 11, color: '#475569', letterSpacing: '0.04em' }}>
+              {pendingAbility !== null
+                ? '▶ Click an enemy unit to target'
+                : selectedCardId !== null
+                  ? '▶ Click a highlighted slot to play'
+                  : selectedSlot !== null
+                    ? (getLegalTargets(selectedSlot, player.board, enemy.board).length === 0 &&
+                       getLegalMoves(selectedSlot, player.board).length === 0)
+                      ? '▶ This unit has already acted this turn.'
+                      : '▶ Click an enemy to attack or an empty slot to move'
+                    : `HAND ${player.hand.length}/${GAME_CONSTANTS.HAND_SIZE_CAP} — Select a card or unit`}
+            </span>
+            {pendingAbility !== null ? (
+              <button
+                onClick={() => setPendingAbility(null)}
+                style={{ fontFamily: 'monospace', fontSize: 10, background: 'transparent', color: '#94a3b8', border: '1px solid #334155', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', letterSpacing: '0.05em' }}
+              >
+                Cancel
+              </button>
+            ) : activeAbility ? (
+              <button
+                onClick={() => {
+                  if (!activeAbility.canUse) return;
+                  if (activeAbility.needsTarget) {
+                    setPendingAbility(activeAbility.id);
+                    setSelectedSlot(null);
+                    setSelectedCardId(null);
+                  } else {
+                    const sourceSlot = findCompanionSlot(player.board, player.companion.instanceId);
+                    if (sourceSlot) dispatch({ type: 'ACTIVATE_ABILITY', sourceSlot, abilityId: activeAbility.id });
+                  }
+                }}
+                disabled={!activeAbility.canUse}
+                onMouseEnter={(e) => { if (activeAbility.canUse) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(167,139,250,0.15)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                style={{
+                  fontFamily: 'monospace', fontSize: 10,
+                  background: 'transparent',
+                  color: activeAbility.canUse ? '#a78bfa' : '#475569',
+                  border: `1px solid ${activeAbility.canUse ? 'rgba(167,139,250,0.5)' : '#334155'}`,
+                  borderRadius: 4, padding: '3px 10px', cursor: activeAbility.canUse ? 'pointer' : 'default',
+                  letterSpacing: '0.05em', transition: 'background 150ms ease',
+                  boxShadow: activeAbility.canUse ? '0 0 8px rgba(167,139,250,0.2)' : 'none',
+                }}
+              >
+                ✦ {activeAbility.label}{activeAbility.energyCost > 0 ? ` (${activeAbility.energyCost}⚡)` : ''}
+              </button>
+            ) : null}
           </div>
           <Hand
             hand={player.hand}

@@ -2,12 +2,13 @@
 import React from 'react';
 import { createInitialGameState } from './initialState';
 import { getCardDefinition, getCardDefinitionOrThrow } from '../cards/registry';
-import { tempoDeck, sacrificeDeck, DeckConfig } from '../cards/decks';
+import { remnantDecks, DeckConfig } from '../cards/decks';
 import { playUnitCard, playSpellCard, playUpgradeCard } from '../engine/cardPlay';
 import { resolveMove } from '../engine/movement';
 import { resolveAttack } from '../engine/combat';
 import { startTurn, endTurn } from '../engine/turnFlow';
 import { placeCardFaceDown, isReadyToReveal, revealOpeningBoards } from '../engine/opening';
+import { activateAbility } from '../engine/abilities';
 
 type GameContextValue = {
   state: GameState;
@@ -53,6 +54,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
     case 'REVEAL_BOARDS':
       return startTurn(revealOpeningBoards(state));
+    case 'ACTIVATE_ABILITY':
+      return activateAbility(state, state.activePlayerId, action.abilityId, action.targetSlot);
     default:
       return state;
   }
@@ -99,33 +102,47 @@ function buildCompanionInstance(deckConfig: DeckConfig, ownerId: string): Compan
   };
 }
 
-const base = createInitialGameState('player-1', 'player-2');
+function buildInitialState(p1DeckId: string, p2DeckId: string): GameState {
+  const p1Deck = remnantDecks.find((d) => d.deckId === p1DeckId) ?? remnantDecks[0];
+  const p2Deck = remnantDecks.find((d) => d.deckId === p2DeckId) ?? remnantDecks[1];
 
-const p1FullDeck = buildDeckInstances(tempoDeck, 'player-1');
-const p2FullDeck = buildDeckInstances(sacrificeDeck, 'player-2');
+  const base = createInitialGameState('player-1', 'player-2');
 
-const p1Companion = buildCompanionInstance(tempoDeck, 'player-1');
-const p2Companion = buildCompanionInstance(sacrificeDeck, 'player-2');
+  const p1FullDeck = buildDeckInstances(p1Deck, 'player-1');
+  const p2FullDeck = buildDeckInstances(p2Deck, 'player-2');
 
-const initialState: GameState = {
-  ...base,
-  players: [
-    {
-      ...base.players[0],
-      hand: [p1Companion, ...p1FullDeck.slice(0, 5)],
-      deck: p1FullDeck.slice(5),
-      companion: p1Companion,
-    },
-    {
-      ...base.players[1],
-      hand: [p2Companion, ...p2FullDeck.slice(0, 5)],
-      deck: p2FullDeck.slice(5),
-      companion: p2Companion,
-    },
-  ],
-};
+  const p1Companion = buildCompanionInstance(p1Deck, 'player-1');
+  const p2Companion = buildCompanionInstance(p2Deck, 'player-2');
 
-export function GameStateProvider({ children }: { children: React.ReactNode }) {
+  return {
+    ...base,
+    players: [
+      {
+        ...base.players[0],
+        hand: [p1Companion, ...p1FullDeck.slice(0, 5)],
+        deck: p1FullDeck.slice(5),
+        companion: p1Companion,
+      },
+      {
+        ...base.players[1],
+        hand: [p2Companion, ...p2FullDeck.slice(0, 5)],
+        deck: p2FullDeck.slice(5),
+        companion: p2Companion,
+      },
+    ],
+  };
+}
+
+export function GameStateProvider({
+  children,
+  p1DeckId,
+  p2DeckId,
+}: {
+  children: React.ReactNode;
+  p1DeckId: string;
+  p2DeckId: string;
+}) {
+  const initialState = React.useMemo(() => buildInitialState(p1DeckId, p2DeckId), [p1DeckId, p2DeckId]);
   const [state, dispatch] = React.useReducer(gameReducer, initialState);
   return React.createElement(GameStateContext.Provider, { value: { state, dispatch } }, children);
 }

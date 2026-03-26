@@ -5,6 +5,7 @@ import { getCompanionDisplayName } from '../utils/logHelpers';
 
 type EndScreenProps = {
   state: GameState;
+  onReset: () => void;
 };
 
 const companionDisplayName = getCompanionDisplayName;
@@ -84,7 +85,7 @@ function PlayerColumn({
   );
 }
 
-export function EndScreen({ state }: EndScreenProps) {
+export function EndScreen({ state, onReset }: EndScreenProps) {
   const winner = state.players.find((p) => p.playerId === state.winner) ?? state.players[0];
   const loser = state.players.find((p) => p.playerId !== state.winner) ?? state.players[1];
 
@@ -139,7 +140,7 @@ export function EndScreen({ state }: EndScreenProps) {
       </div>
 
       <button
-        onClick={() => window.location.reload()}
+        onClick={onReset}
         style={{
           padding: '10px 32px',
           fontSize: 14,

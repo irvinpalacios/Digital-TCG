@@ -88,14 +88,16 @@ export function handleDeath(
     next = gainCharge(next, playerId, chargeKeyword.value);
   }
 
+  // Seravine Null — "The Reading": gain +1 Charge whenever a friendly unit dies
   if (!isCompanionDeath) {
     for (const p of next.players) {
-      if (p.companion.definitionId === 'ember-wisp' && p.playerId === playerId) {
+      if (
+        (p.companion.definitionId === 'seravine-null' ||
+         p.companion.definitionId === 'seravine-null-recalled') &&
+        p.playerId === playerId
+      ) {
         next = gainCharge(next, p.playerId, 1);
-        next = {
-          ...next,
-          eventLog: [...next.eventLog, `Ember Wisp's Soul Siphon — gained 1 Charge.`],
-        };
+        next = { ...next, eventLog: [...next.eventLog, `Seravine's The Reading — gained 1 Charge.`] };
       }
     }
   }
@@ -119,6 +121,10 @@ export function resolveAttack(
   const attacker = getSlot(attackerPlayer.board, attackerPosition).occupant;
   if (attacker === null) return state;
 
+  if (attacker.frozen) {
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolveCardName(attacker.instanceId, state)} is frozen and cannot attack.`] };
+  }
+
   const targetPlayer = state.players.find((p) => p.playerId === targetPlayerId)!;
   const targetOccupant = getSlot(targetPlayer.board, targetPosition).occupant;
   const isCompanionTarget =
@@ -126,6 +132,16 @@ export function resolveAttack(
     targetOccupant.instanceId === targetPlayer.companion.instanceId;
 
   let next = dealDamage(state, targetPlayerId, targetPosition, attacker.currentAttack);
+
+  // Xochitl Pavón — "Ofrenda Sagrada": gain +1 Charge whenever Xochitl deals combat damage
+  if (
+    attacker.instanceId === attackerPlayer.companion.instanceId &&
+    (attackerPlayer.companion.definitionId === 'xochitl-pavon' ||
+     attackerPlayer.companion.definitionId === 'xochitl-pavon-recalled')
+  ) {
+    next = gainCharge(next, attackerPlayerId, 1);
+    next = { ...next, eventLog: [...next.eventLog, `Xochitl's Ofrenda Sagrada — gained 1 Charge.`] };
+  }
 
   if (isCompanionTarget) {
     const companionHp = next.players.find((p) => p.playerId === targetPlayerId)!.companion.currentHp;

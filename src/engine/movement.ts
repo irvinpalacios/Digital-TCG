@@ -25,6 +25,10 @@ export function resolveMove(
     };
   }
 
+  if (fromSlot.occupant.frozen) {
+    return { ...state, eventLog: [...state.eventLog, `⚠ ${resolveCardName(fromSlot.occupant.instanceId, state)} is frozen and cannot move.`] };
+  }
+
   const legalMoves = getLegalMoves(fromPosition, player.board);
   const isLegal = legalMoves.some(
     (pos) => pos.row === toPosition.row && pos.index === toPosition.index,

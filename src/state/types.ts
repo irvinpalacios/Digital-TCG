@@ -17,6 +17,8 @@ type CardDefinition = {
   keywords: KeywordInstance[];
   evolutionTarget?: string;
   evolutionChargeThreshold?: number;
+  timeline?: string;
+  subtype?: string;
 };
 
 type CardInstance = {
@@ -29,6 +31,9 @@ type CardInstance = {
   hasAttackedThisTurn: boolean;
   hasMovedThisTurn: boolean;
   cost: number;
+  frozen?: boolean;
+  weakenedStacks?: number;
+  markedAsOffering?: boolean;
 };
 
 type CompanionInstance = CardInstance & {
@@ -69,7 +74,7 @@ type GameAction =
   | { type: 'PLAY_CARD'; cardInstanceId: string; targetSlot: SlotPosition; sourceSlot?: SlotPosition }
   | { type: 'MOVE_UNIT'; fromSlot: SlotPosition; toSlot: SlotPosition }
   | { type: 'ATTACK'; attackerSlot: SlotPosition; targetSlot: SlotPosition }
-  | { type: 'ACTIVATE_ABILITY'; sourceSlot: SlotPosition; abilityId: string }
+  | { type: 'ACTIVATE_ABILITY'; sourceSlot: SlotPosition; abilityId: string; targetSlot?: SlotPosition }
   | { type: 'END_TURN' }
   | { type: 'PLACE_CARD_FACE_DOWN'; cardInstanceId: string; playerId: string; targetSlot: { row: 'front' | 'back'; index: 0 | 1 | 2 } }
   | { type: 'REVEAL_BOARDS' };

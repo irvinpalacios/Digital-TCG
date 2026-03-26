@@ -145,7 +145,18 @@ export function BoardSlot({
                 {isCompanion ? '⬡' : isRanged ? '◎' : ''}
               </span>
             </div>
-            <div style={{ flex: 1 }} />
+            {/* Status badges */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 2, paddingBottom: 1 }}>
+              {slot.occupant?.frozen && (
+                <span style={{ fontSize: 7, color: '#7dd3fc', fontFamily: 'monospace', letterSpacing: '0.04em' }}>❄ FROZEN</span>
+              )}
+              {(slot.occupant?.weakenedStacks ?? 0) > 0 && (
+                <span style={{ fontSize: 7, color: '#fca5a5', fontFamily: 'monospace', letterSpacing: '0.04em' }}>↓ WEAK ×{slot.occupant!.weakenedStacks}</span>
+              )}
+              {slot.occupant?.markedAsOffering && (
+                <span style={{ fontSize: 7, color: '#d8b4fe', fontFamily: 'monospace', letterSpacing: '0.04em' }}>✦ OFFERING</span>
+              )}
+            </div>
             {/* Bottom row: HP + ATK */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8' }}>

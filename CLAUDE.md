@@ -13,8 +13,8 @@ This is not a clone. Key differentiators:
 - Companion as the **win condition** (no player life totals)
 - Face-down **simultaneous opening deployment**
 - Movement as a tactical action
-- **Charge** resource specifically for evolution
-- Dual-resource system: Energy (tempo) + Charge (evolution)
+- **Charge** resource specifically for Recall (evolution)
+- Dual-resource system: Energy (tempo) + Charge (Recall)
 
 ---
 
@@ -25,7 +25,7 @@ This is not a clone. Key differentiators:
 3. Fast matches — 8–12 min target
 4. Positioning matters — front/back row have different rules
 5. Sacrifice can be strategic — feeding Charge
-6. Evolution is a core mechanic — not optional flavor
+6. Recall is a core mechanic — not optional flavor
 7. Limited counterplay — light reaction system only
 8. Board state must be compact and readable
 
@@ -55,9 +55,9 @@ Rules:
 
 ## Turn Structure
 
-1. **Start of Turn** — check companion evolution condition
-2. **Draw** — draw to refill toward hand size (hand cap: 5)
-3. **Energy Refresh** — Energy refills to current max
+1. **Start of Turn** — Energy max grows (+1, cap 6), Energy refills, actions reset to 3, draw to hand cap
+2. **Baseline Charge** — +1 Charge granted to active player
+3. **Recall Check** — if companion Charge ≥ threshold, Recall fires (stats + board slot updated)
 4. **Action Phase** — player takes up to **3 actions**
 5. **End of Turn** — cleanup, pass
 
@@ -66,7 +66,6 @@ Rules:
 - Move a unit
 - Attack with a unit
 - Activate an ability
-- Evolve (if triggered at start of turn, this may be free — TBD)
 
 ---
 
@@ -77,124 +76,60 @@ Rules:
 - Max increases **+1 per turn**
 - Caps at **6**
 - Refills fully each turn
-- Spent on: playing cards, abilities, upgrades
+- Spent on: playing cards, abilities
 
 ### Charge
-- Used exclusively for companion **evolution**
+- Used exclusively for companion **Recall**
 - Accumulated via:
   - Turn progression (baseline gain)
   - Friendly units dying
   - Companion dealing damage
   - Specific card effects
-- Evolution check happens at **start of turn**
+- Recall check happens at **start of turn**
 
 ---
 
-## Evolution System
+## Recall System (formerly "Evolution")
 
 - Check at **start of player's turn**
-- If companion has enough Charge AND meets any additional condition → may evolve
-- Evolution updates: stats, abilities, tactical role
+- If companion has enough Charge → Recalls
+- Recall updates: stats (HP/ATK), abilities, tactical role
+- HP carries over — does not reset on Recall
 - Should feel like a **power spike**, not an instant win
 
 ---
 
-## MVP Scope — Build Only This First
+## Remnants
 
-### Include in MVP:
-- [ ] Game state model
-- [ ] Board (6 slots per player)
-- [ ] Companion unit with HP, attack, movement
-- [ ] 3 actions per turn
-- [ ] Energy system
-- [ ] Charge system (basic accumulation)
-- [ ] Simple evolution (stat change + ability update)
-- [ ] Movement (adjacent empty slot)
-- [ ] Combat (front row priority, Ranged exception)
-- [ ] Turn flow
-- [ ] Card play (place into slot)
-- [ ] 2 prototype decks
+Companions are called **Remnants** — legendary figures from fractured timelines who arrive diminished, and Recall their defining power when enough Charge accumulates.
 
-### Explicitly Exclude from MVP:
-- Reaction / interrupt system
-- Multiple factions
-- Keywords beyond: `Ranged`, `Charge: X`
-- Polished UI
-- Networking / multiplayer
-- Sound / animation
+See `docs/REMNANTS.md` for full lore, card specs, and implementation notes.
 
----
+### Active Remnants
 
-## Core Data Types to Implement
+| Remnant | Timeline | Role | HP | ATK | Recall @ |
+|---|---|---|---|---|---|
+| Caelum Voss | Iron Century | Control / Temporal Disruption | 7 | 2→4 | 6 Charge |
+| Seravine Null | Ashen Covenant | Attrition / Knowledge Control | 8 | 1→2 | 7 Charge |
+| Xochitl Pavón | El Quinto Sol | Sacred Momentum / Offensive Sustain | 7 | 3→5 | 7 Charge |
 
-```ts
-GameState
-PlayerState
-BoardState
-Slot           // { position: 'front'|'back', index: 0|1|2, occupant: CardInstance | null }
-CardDefinition // static card data
-CardInstance   // runtime card on board
-CompanionState // extends CardInstance, tracks evolution stage
-Action         // { type, source, target, cost }
-Effect         // resolved game effect
-TargetRule     // legal target constraint
-```
+### Caelum Voss — Iron Century
+- Units: Synchron Guard (2/4 cost2), Gearwright Apprentice (1/2 cost1), Pressure Monk (1/3 cost2 Charge:1), Ironveil Smuggler (2/2 cost2 Ranged), Underlurge Echo (4/5 cost4)
+- Passive: "Measured Presence" — spell immunity before Recall (STUB — no spells in deck yet)
+- Recalled active: "Unwound Hour" — 1 action, 0 Energy; freeze one enemy unit until start of their owner's next turn (LIVE)
+- Recalled passive: "Temporal Read" — at start of turn, if Caelum is in the back row, gain +1 Charge (LIVE)
 
----
+### Seravine Null — Ashen Covenant
+- Units: Covenant Warden (2/4 cost2), Ash Scribe (1/2 cost1 Charge:1), Lector Surgeon (1/4 cost2), Quarantine Sentinel (2/4 cost3), The Remembered (3/6 cost4 Charge:2)
+- Passive: "The Reading" — when a friendly unit dies, gain +1 Charge (LIVE)
+- Recalled active: "Null Codex" — 1 action, 1 Energy; apply Weakened to all enemy units (LIVE)
+- Recalled passive: "Compound Reading" — at start of Seravine's turn, each already-Weakened enemy gains +1 additional Weakened stack (LIVE)
 
-## Core Engine Functions to Implement
-
-```ts
-startGame()
-revealOpeningBoard()
-drawCard()
-playCard(card, slot)
-moveUnit(from, to)
-attackTarget(attacker, target)
-endTurn()
-gainCharge(amount)
-checkCompanionEvolution()
-resolveEffect(effect)
-getLegalMoves(unit)
-getLegalTargets(attacker)
-isVulnerable(slot)
-```
-
----
-
-## Prototype Decks
-
-### Deck 1: Tempo / Lane Pressure
-
-**Companion:** Auric Cub → evolves into Auric Leon
-
-| Card | Type | Cost | Notes |
-|---|---|---|---|
-| Lane Prowler | Unit | 2 | Mobile, lane pressure |
-| Vanguard Hound | Unit | 1 | Fast front-row filler |
-| Bolt Skipper | Unit | 2 | Ranged |
-| Pack Signal | Spell | 1 | Repositioning effect |
-| Sharpen Instinct | Upgrade | 2 | Attack buff |
-| Pounce Window | Spell | 1 | Opens a lane |
-
-**Strategy:** Push lanes, reposition, open vulnerabilities, tempo into evolution.
-
----
-
-### Deck 2: Sacrifice / Evolution Ramp
-
-**Companion:** Ember Wisp → evolves into Cinder Seraph
-
-| Card | Type | Cost | Notes |
-|---|---|---|---|
-| Ash Drudge | Unit | 1 | Dies easily, generates Charge |
-| Pyre Acolyte | Unit | 2 | Gains Charge on death |
-| Grave Lancer | Unit | 3 | Ranged, bonus on ally death |
-| Soul Kindle | Spell | 1 | Sacrifice a unit for Charge burst |
-| Ember Mantle | Upgrade | 2 | Companion buff |
-| Death Flare | Spell | 2 | Board damage, generates Charge |
-
-**Strategy:** Turn losses into Charge, accelerate evolution, win via power spike.
+### Xochitl Pavón — El Quinto Sol
+- Units: Cuauhpilli Vanguard (2/4 cost2 Charge:1), Telpochcalli Scout (2/2 cost1), La Cantora Sagrada (1/3 cost2 Ranged Charge:1), Serpiente de Jade (2/4 cost3), Quetzal Ascendant (4/6 cost5)
+- Passive: "Ofrenda Sagrada" — when Xochitl deals combat damage, gain +1 Charge (LIVE)
+- Recalled active: "Xochiyaoyotl" — 1 action, 0 Energy; mark one enemy unit as sacred offering (LIVE)
+- Recalled passive: "Plumas de Quetzalcóatl" — on attack, grant 1 Charge to a friendly unit of choice (STUB — requires mid-resolution targeting)
 
 ---
 
@@ -205,7 +140,8 @@ tactical-tcg/
 ├── CLAUDE.md               ← you are here
 ├── docs/
 │   ├── DESIGN_SPEC.md      ← full design document
-│   ├── CARDS.md            ← card definitions
+│   ├── REMNANTS.md         ← Remnant lore + card specs (canonical)
+│   ├── CARDS.md            ← legacy card reference
 │   └── ROADMAP.md          ← phased build plan
 ├── src/
 │   ├── engine/             ← core game loop, turn flow, resolution
@@ -246,7 +182,7 @@ tactical-tcg/
 ## Current Status
 
 - [x] Design spec complete
-- [x] Two prototype deck identities defined
+- [x] Remnant character bible complete (3 active Remnants in `docs/REMNANTS.md`)
 - [x] Folder structure initialized
 - [x] Game state model (Phase 1)
 - [x] Turn flow engine (Phase 2)
@@ -259,7 +195,12 @@ tactical-tcg/
 - [x] Action economy enforced: attack/move/play all cost 1 action, validated
 - [x] Companion sync: dealDamage keeps companion.currentHp in sync with board slot
 - [x] Lane targeting rules locked in: melee same-lane only, ranged ±1 lane
-- [x] Turn draw: startTurn fills hand to HAND_SIZE_CAP in one pass
+- [x] Remnant card system: 3 Remnants × 5 units = 15 unit defs + 6 companion defs
+- [x] Deck selection screen: pre-game UI lets players choose any two different Remnants
+- [x] Seravine passive live: "The Reading" fires on ally death
+- [x] Xochitl passive live: "Ofrenda Sagrada" fires on Xochitl combat damage
+- [x] Recall active abilities: Unwound Hour (Caelum), Null Codex (Seravine), Xochiyaoyotl (Xochitl)
+- [x] Recall passives: Temporal Read (Caelum), Compound Reading (Seravine)
 - [ ] Playtesting and tuning (Phase 7) — IN PROGRESS
 
 ---
@@ -271,26 +212,20 @@ Bugs found and fixed during development. Do not re-introduce these.
 | Bug | Root Cause | Fix |
 |---|---|---|
 | **Opening phase auto-advanced after 1 card** | `p1Placed` used `.length` on `openingPlacements`, which is a 6-element sparse array initialized on first placement — so length was immediately 6 | Changed to `.filter(fc => fc !== null).length` to count only placed cards |
-| **`revealOpeningBoards` built plain `CardInstance` for companion** | `makeInstance` always constructed a fresh `CardInstance` from the definition, discarding companion fields (`evolutionStage`, `charge`, `evolutionDefinitionId`) | Added a check: if `fc.instanceId === player.companion.instanceId`, return `player.companion` directly |
-| **`player` and `enemy` hardcoded to `'player-1'`/`'player-2'`** | `GameScreen.tsx` hardcoded `state.players.find(p => p.playerId === 'player-1')` — after End Turn, the active player was still shown as player-1 | Changed to derive from `state.activePlayerId` and `!== state.activePlayerId` |
-| **Companion HP not updated when taking damage** | `dealDamage` updated the board slot occupant's `currentHp` but left `player.companion.currentHp` unchanged — win detection read stale HP | `dealDamage` now checks if damaged occupant is the companion and updates both the board slot and `player.companion` in the same map pass |
-| **Win detection read HP before damage was applied** | `resolveAttack` checked `companion.currentHp <= 0` after `handleDeath`, but `handleDeath` clears the slot — the check needed to happen after `dealDamage` (which now syncs the companion) | Moved win check to immediately after `dealDamage`, before `handleDeath` |
-| **Attack and move consumed no actions** | `resolveAttack` and `resolveMove` had no `spendAction` call — players could attack and move unlimited times | Added `spendAction(result, playerId)` at end of both functions; added `hasActionsRemaining` guard at top of both |
-| **`FaceDownCard` missing `definitionId`** | Original `FaceDownCard` type had no `definitionId` field — `revealOpeningBoards` couldn't look up the card definition at reveal time | Added `definitionId: string` to `FaceDownCard`; `placeCardFaceDown` copies it from the `CardInstance` |
-| **`placeCardFaceDown` appended to array end** | Cards were pushed onto `openingPlacements` in click order with no slot mapping — there was no way to control which board slot a card ended up in | Replaced with a 6-element sparse array indexed by slot number (front 0-2, back 3-5); `placeCardFaceDown` now takes `targetSlot` and inserts at the correct index |
-| **Turn 1 had no draw and wrong energy** | `REVEAL_BOARDS` and auto-reveal transitioned to `'main'` without calling `startTurn` — players started with 0 cards | Both reducer cases now call `startTurn(revealOpeningBoards(...))` |
-| **Evolution permanently blocked** | `checkCompanionEvolution` was never called in `startTurn`; `evolutionChargeThreshold` was never copied from `CardDefinition` onto `CompanionInstance` so threshold resolved to `Infinity` | Added `evolutionChargeThreshold` field to `CompanionInstance` type; `buildCompanionInstance` copies it from the def; `startTurn` now calls `gainCharge` (baseline) then `checkCompanionEvolution` |
-| **Evolution didn't apply evolved stats** | `checkCompanionEvolution` only bumped `evolutionStage` to 2 — it never looked up the evolved definition to apply new HP/ATK/keywords | Now calls `getCardDefinitionOrThrow(companion.evolutionDefinitionId)` and applies `currentHp`, `currentAttack`, `keywords` from the evolved def |
-| **No baseline charge gained per turn** | `CHARGE_BASELINE_PER_TURN` was defined but never used anywhere | `startTurn` now calls `gainCharge(next, activePlayerId, CHARGE_BASELINE_PER_TURN)` after energy reset |
-| **Death Flare only castable on own empty slots** | `playerLegalTargets` for spells used `getLegalPlaySlots` (empty slots only); `handleEnemySlotClick` only handled attacks, not spell casts | Added `isDeathFlare` flag; when true, all 6 enemy slots are shown as legal targets and clicking any enemy slot dispatches `PLAY_CARD` |
-| **Death Flare didn't detect companion kill** | `handleDeath` clears board slots but never sets `winner`; Death Flare's death loop called `handleDeath` but didn't check for companion death afterward | Added post-loop win check in Death Flare: iterates `next.players`, sets `winner` + `phase: 'ended'` if any companion HP ≤ 0 |
-| **Sharpen Instinct applied no effect** | `playUpgradeCard` had only a generic stub — all upgrades removed the card and spent resources but changed nothing | Added `'sharpen-instinct'` case: applies `+2 currentAttack` to the board slot occupant at `targetSlot` |
+| **`revealOpeningBoards` built plain `CardInstance` for companion** | `makeInstance` always constructed a fresh `CardInstance` from the definition, discarding companion fields | Added a check: if `fc.instanceId === player.companion.instanceId`, return `player.companion` directly |
+| **`player` and `enemy` hardcoded to `'player-1'`/`'player-2'`** | `GameScreen.tsx` hardcoded IDs — after End Turn, the active player was still shown as player-1 | Changed to derive from `state.activePlayerId` and `!== state.activePlayerId` |
+| **Companion HP not updated when taking damage** | `dealDamage` updated the board slot but left `player.companion.currentHp` unchanged | `dealDamage` now syncs both the board slot and `player.companion` in the same map pass |
+| **Win detection read HP before damage was applied** | `resolveAttack` checked `companion.currentHp <= 0` after `handleDeath` (slot already cleared) | Moved win check to immediately after `dealDamage`, before `handleDeath` |
+| **Attack and move consumed no actions** | `resolveAttack` and `resolveMove` had no `spendAction` call | Added `spendAction(result, playerId)` at end of both functions |
+| **Evolution permanently blocked** | `checkCompanionEvolution` was never called in `startTurn`; `evolutionChargeThreshold` was never copied from `CardDefinition` | Added `evolutionChargeThreshold` to `CompanionInstance`; `buildCompanionInstance` copies it; `startTurn` calls evolution check |
+| **Evolution didn't apply evolved stats or sync board** | `checkCompanionEvolution` only bumped `evolutionStage` to 2; board slot occupant was never updated | Now looks up evolved definition, applies HP/ATK/keywords to both `player.companion` and the board slot occupant via `syncRow` |
+| **No baseline charge gained per turn** | `CHARGE_BASELINE_PER_TURN` was defined but never used | `startTurn` now calls `gainCharge(next, activePlayerId, CHARGE_BASELINE_PER_TURN)` after energy reset |
 
 ---
 
 ## Session Snapshot
 
-*Updated 2026-03-22. Overwrites previous snapshot entirely.*
+*Updated 2026-03-25 (latest). Overwrites previous snapshot entirely.*
 
 ---
 
@@ -299,38 +234,41 @@ Bugs found and fixed during development. Do not re-introduce these.
 | Phase | Description | Status |
 |---|---|---|
 | Phase 1 | Core type system — `types.ts` (global ambient), `initialState.ts` (empty board + player factories) | ✅ Done |
-| Phase 2 | Turn flow — `startTurn` (energy reset, draw to hand cap, baseline charge, evolution check), `endTurn`, `gainCharge`, `checkCompanionEvolution` | ✅ Done |
+| Phase 2 | Turn flow — `startTurn` (energy reset, draw to hand cap, baseline charge, Recall check), `endTurn`, `gainCharge`, `checkCompanionEvolution` | ✅ Done |
 | Phase 3 | Combat + movement — `resolveAttack` (action cost, win detection, companion sync), `resolveMove` (action cost), `dealDamage`, `handleDeath` | ✅ Done |
-| Phase 4 | Card play — `playUnitCard`, `playSpellCard` (Soul Kindle, Death Flare), `playUpgradeCard` (Ember Mantle, Sharpen Instinct); `spendAction` exported | ✅ Done |
+| Phase 4 | Card play — `playUnitCard`, `playSpellCard` (generic fallthrough), `playUpgradeCard` (generic fallthrough); `spendAction` exported | ✅ Done |
 | Phase 5 | Opening engine — `placeCardFaceDown` (sparse array, slot targeting), `isReadyToReveal`, `revealOpeningBoards` + `startTurn` called after reveal | ✅ Done |
-| Pre-6 | Card data — 16 `CardDefinition` objects, `getCardDefinition`/`getCardDefinitionOrThrow` registry, `tempoDeck` + `sacrificeDeck` configs | ✅ Done |
+| Pre-6 | Card data — 21 `CardDefinition` objects (3 Remnants × 5 units + 6 companion/recalled forms); registry; 3 `DeckConfig` objects + `remnantDecks[]` export | ✅ Done |
 | Phase 6 | UI — all components wired to real state; `GameRouter` routes by phase; `GameScreen` has full click/selection/dispatch loop | ✅ Done |
 | Opening Fixes | Sparse placement array; slot-targeted drag-and-drop; `playerId` field on action; count fix (non-null filter); two-step reveal confirmation | ✅ Done |
 | Action economy | `resolveAttack` and `resolveMove` both call `spendAction`; both guard with `hasActionsRemaining`; auto-end turn when actions reach 0 | ✅ Done |
 | Companion sync | `dealDamage` updates both board slot occupant and `player.companion.currentHp` in the same map pass | ✅ Done |
 | Lane targeting | `getLegalTargets` rewritten: melee same lane only; ranged own lane + adjacent (±1); back slot reachable only when front is empty | ✅ Done |
-| Evolution system | `checkCompanionEvolution` called every `startTurn`; threshold stored on instance; evolved def stats applied to companion on trigger | ✅ Done |
-| Card effects | Soul Kindle (+3 Charge via sacrifice), Death Flare (2 AoE damage + Charge per kill), Ember Mantle (+2 HP/+1 ATK companion), Sharpen Instinct (+2 ATK unit) | ✅ Done |
-| UI polish | `Hand.tsx` type badges, cost, HP/ATK; `BoardSlot.tsx` shows HP, ATK, Melee/Ranged; auto-pass banner; Death Flare highlights enemy board | ✅ Done |
+| Recall system | `checkCompanionEvolution` called every `startTurn`; threshold stored on instance; evolved def stats applied to companion AND board slot occupant on trigger via `syncRow` | ✅ Done |
+| Remnant rollout | Old prototype decks removed; 3 Remnant decks implemented; `DeckSelectScreen` added; Seravine + Xochitl passives live | ✅ Done |
+| Game reset | `EndScreen` "Play Again" wired to `App.tsx` state reset via `onReset` prop — no page reload | ✅ Done |
+| Recall abilities | Unwound Hour (freeze), Null Codex (Weaken all), Xochiyaoyotl (mark offering); Temporal Read + Compound Reading passives; frozen/weakened/offering status system; ability targeting UI | ✅ Done |
 
 ---
 
 ### Current State of the Game (what works when you run `npm run dev`)
 
-- Game opens in `phase: 'opening'`
-- Each player has 6 cards in hand: companion + 5 deck cards; drag to placement grid, front/back rows
-- After both players place 6, two-step confirm → reveal transitions to `phase: 'main'`; `startTurn` fires immediately so turn 1 has correct energy, actions, and draw
-- Main screen: enemy board (flipped) on top, event log in middle, player board below, hand + HUD at bottom
+- Game opens on **DeckSelectScreen** — P1 and P2 each pick a Remnant (cannot pick the same one); Start Game enabled when both have selected
+- After Start Game, transitions to `phase: 'opening'`
+- Each player has 6 cards in hand: companion + 5 deck units; drag to placement grid, front/back rows
+- After both players place 6, two-step confirm → reveal transitions to `phase: 'main'`; `startTurn` fires immediately
+- Main screen: enemy board (flipped) on top, tactical log sidebar (right), player board below, hand + HUD at bottom
 - Unit cards can be played to empty board slots (Energy deducted, action spent); board shows name/HP/ATK/Melee/Ranged
 - Units can move to adjacent empty slots; melee attacks same-lane enemy; ranged attacks own + adjacent lanes
-- **Soul Kindle**: select from hand, click own non-companion unit to sacrifice it — grants 3 Charge
-- **Death Flare**: select from hand, click any enemy slot — deals 2 damage to all units on both boards, grants 1 Charge per kill; detects companion kill and ends game
-- **Ember Mantle**: select from hand, play on any slot — companion gains +2 HP, +1 ATK; +1 Charge bonus if companion is Ember Wisp
-- **Sharpen Instinct**: select from hand, click own occupied slot — target unit gains +2 ATK permanently
 - Each turn: `startTurn` resets energy (grows +1/turn, cap 6), resets actions to 3, draws to hand cap, grants 1 baseline Charge
 - When active player's actions reach 0, a gold banner appears and the turn auto-ends after 1.2 seconds
-- Evolution: at `startTurn`, if companion charge ≥ threshold, companion stats update to evolved definition (e.g. Auric Cub → Auric Leon)
-- Companion HP → 0 triggers `winner` + `phase: 'ended'`; `GameRouter` shows winner screen
+- **Seravine passive**: when any friendly unit dies, event log shows "Seravine's The Reading — gained 1 Charge"
+- **Xochitl passive**: when Xochitl attacks, event log shows "Xochitl's Ofrenda Sagrada — gained 1 Charge"
+- Recall: at `startTurn`, if companion charge ≥ threshold, companion stats update to Recalled form
+- **Recall active abilities**: once Recalled, a `✦ [Ability Name]` button appears above the hand; Seravine fires immediately (Null Codex — Weaken all enemies, costs 1 Energy); Caelum and Xochitl enter targeting mode (all occupied enemy slots highlight; click one to apply Unwound Hour freeze or Xochiyaoyotl mark)
+- **Recall passives**: Temporal Read (Caelum in back row → +1 Charge at turn start); Compound Reading (each already-Weakened enemy gains +1 Weakened stack at start of Seravine's turn)
+- **Status badges**: board slots show `❄ FROZEN`, `↓ WEAK ×N`, `✦ OFFERING` text badges when effects are active
+- Companion HP → 0 triggers `winner` + `phase: 'ended'`; `GameRouter` shows winner screen with "Play Again" → returns to deck selector (no page reload)
 - TypeScript: zero errors (`npx tsc --noEmit` clean)
 
 ---
@@ -339,13 +277,9 @@ Bugs found and fixed during development. Do not re-introduce these.
 
 | Issue | Location | Notes |
 |---|---|---|
-| **Pack Signal, Pounce Window effects missing** | `cardPlay.ts` `playSpellCard` | No case for `'pack-signal'` or `'pounce-window'`. Cards are consumed with no effect. Pack Signal should reposition a unit; Pounce Window should open a lane vulnerability. |
-| **Grave Lancer death bonus missing** | `cardPlay.ts`, `combat.ts` | Grave Lancer has a "bonus on ally death" effect that isn't implemented. `handleDeath` grants Charge keyword value but has no per-card death trigger system. |
-| **Evolution doesn't update board slot** | `turnFlow.ts` `checkCompanionEvolution` | When evolution fires, `player.companion` gets new stats but the board slot occupant is NOT updated. The companion's displayed HP/ATK on the board won't reflect evolved values until it takes damage (which re-syncs via `dealDamage`). |
-| **Upgrade targeting shows wrong highlights** | `GameScreen.tsx` | When Sharpen Instinct is selected from hand, `getLegalPlaySlots` highlights empty slots (unit placement targets). The player must click an occupied slot — which works — but the green borders are misleading. No dedicated "occupied slot" highlight path exists for upgrades. |
-| **Ember Mantle plays on any slot click** | `GameScreen.tsx`, `cardPlay.ts` | Ember Mantle ignores `targetSlot` entirely and always buffs the companion. But the PLAY_CARD dispatch fires when clicking any own slot. If the player clicks an empty slot while Ember Mantle is selected, it dispatches and succeeds — the UI gives no specific indication that the companion is the target. |
 | **Opening placement order hardcoded** | `OpeningScreen.tsx` | Player 1 always places first. No randomization or coin flip. |
-| **`cost` stored via type assertion, not type field** | `store.ts`, `cardPlay.ts` | `cost` is added to `CardInstance` as `CardInstance & { cost: number }` at build time. The base `CardInstance` type has no `cost` field. This works but is fragile — any code that reads `cost` off an instance must use the same cast. |
+| **Plumas de Quetzalcóatl not yet implemented** | `combat.ts`, `GameScreen.tsx` | Xochitl Recalled passive: "on attack, grant 1 Charge to a friendly unit of your choice" — requires a mid-resolution targeting prompt, deferred. |
+| **No spells or upgrades in current decks** | `definitions.ts`, `decks.ts` | The 2 spell/upgrade slots per deck are TBD per REMNANTS.md. Until added, each deck has 10 unit cards only. |
 
 ---
 
@@ -355,26 +289,30 @@ Bugs found and fixed during development. Do not re-introduce these.
 |---|---|
 | `config/gameConstants.ts` | `GAME_CONSTANTS` — energy cap, growth, hand size cap, actions per turn, `CHARGE_BASELINE_PER_TURN` |
 | `src/main.tsx` | ReactDOM entry — `createRoot` → `<App />` |
-| `src/cards/definitions.ts` | 16 `CardDefinition` objects (both decks + companions + evolved forms) + `allCards[]` |
+| `docs/REMNANTS.md` | Canonical Remnant lore + card specs (3 active Remnants) |
+| `src/cards/definitions.ts` | 21 `CardDefinition` objects (3 companion pairs + 15 units) + `allCards[]` |
 | `src/cards/registry.ts` | `getCardDefinition(id)` and `getCardDefinitionOrThrow(id)` |
-| `src/cards/decks.ts` | `DeckConfig` type; `tempoDeck` (Auric Cub) and `sacrificeDeck` (Ember Wisp), 12 cards each |
-| `src/engine/cardPlay.ts` | `playUnitCard`; `playSpellCard` (Soul Kindle, Death Flare live; Pack Signal/Pounce Window pending); `playUpgradeCard` (Ember Mantle, Sharpen Instinct live); `spendAction` exported |
-| `src/engine/combat.ts` | `dealDamage` (syncs companion HP), `handleDeath` (Charge keyword), `resolveAttack` (action cost, win detection) |
-| `src/engine/movement.ts` | `resolveMove` — action cost, actions guard, legal move check |
+| `src/cards/decks.ts` | `DeckConfig` type; `ironCenturyDeck`, `ashenCovenantDeck`, `quintoSolDeck`; `remnantDecks[]` export |
+| `src/engine/abilities.ts` | `activateAbility` — routes `ACTIVATE_ABILITY` actions: Unwound Hour (freeze), Null Codex (Weaken all), Xochiyaoyotl (mark offering) |
+| `src/engine/cardPlay.ts` | `playUnitCard`; `playSpellCard` (generic); `playUpgradeCard` (generic); `spendAction` exported |
+| `src/engine/combat.ts` | `dealDamage` (syncs companion HP), `handleDeath` (Charge keyword + Seravine passive), `resolveAttack` (action cost, win detection, frozen guard, Xochitl passive) |
+| `src/engine/movement.ts` | `resolveMove` — action cost, actions guard, frozen guard, legal move check |
 | `src/engine/opening.ts` | `placeCardFaceDown` (sparse 6-slot array, slot-targeted), `isReadyToReveal`, `revealOpeningBoards` (companion preserved) |
-| `src/engine/turnFlow.ts` | `startTurn` (energy reset, draw, baseline charge, evolution check), `endTurn`, `gainCharge`, `checkCompanionEvolution` (applies evolved def stats) |
+| `src/engine/turnFlow.ts` | `startTurn` (energy reset, draw, clear statuses, Temporal Read, Compound Reading, baseline charge, Recall check), `endTurn`, `gainCharge`, `checkCompanionEvolution`, `clearActivePlayerStatuses` |
 | `src/rules/movement.ts` | `getAdjacentSlots` (same row ±1, opposite row same index), `getLegalMoves` (empty slots only) |
 | `src/rules/targeting.ts` | `isLaneClear`, `canAttackFromPosition`, `getLegalTargets` (melee same lane; ranged ±1 lane) |
 | `src/rules/validation.ts` | `hasEnoughEnergy`, `hasActionsRemaining`, `isSlotEmpty`, `getLegalPlaySlots` (all empty slots) |
-| `src/state/types.ts` | All global TS types — `CompanionInstance` has `evolutionChargeThreshold: number`; `openingPlacements` is sparse `(FaceDownCard \| null)[]` |
+| `src/state/types.ts` | All global TS types — `CardDefinition` has `timeline?`, `subtype?`; `CompanionInstance` has `evolutionChargeThreshold: number`; `CardInstance` has `frozen?`, `weakenedStacks?`, `markedAsOffering?` |
 | `src/state/initialState.ts` | `createEmptyBoard`, `createInitialPlayerState`, `createInitialGameState` |
-| `src/state/store.ts` | React context + `useReducer`; `gameReducer` calls `startTurn` after reveal; `buildCompanionInstance` copies `evolutionChargeThreshold` |
-| `src/ui/App.tsx` | `GameStateProvider` wraps `GameRouter`; routes `'opening'` → `OpeningScreen`, `'main'` → `GameScreen`, `'ended'`/winner → winner screen |
+| `src/state/store.ts` | React context + `useReducer`; accepts `p1DeckId`/`p2DeckId` props; `buildInitialState` looks up from `remnantDecks` |
+| `src/ui/App.tsx` | Deck selection state (`deckSelections`); threads `onReset` to `GameRouter`; renders `DeckSelectScreen` when null |
+| `src/ui/DeckSelectScreen.tsx` | Two-column pre-game selector; prevents duplicate picks; Start Game button |
+| `src/ui/EndScreen.tsx` | GAME OVER screen; winner/loser columns with HP pips and evolution turn; key moment from log; "Play Again" calls `onReset` |
 | `src/ui/OpeningScreen.tsx` | Drag-and-drop face-down placement; sparse-array `filled` check; two-step reveal confirmation |
-| `src/ui/GameScreen.tsx` | Click/select/dispatch loop; `isDeathFlare` flag for enemy board targeting; auto-end turn `useEffect` with banner |
+| `src/ui/GameScreen.tsx` | Click/select/dispatch loop; `pendingAbility` targeting mode; `✦ [Ability]` button with cancel; auto-end turn banner; evolution banner |
 | `src/ui/Board.tsx` | 3×2 grid of `BoardSlot`; `flipped` renders back row first for enemy perspective |
-| `src/ui/BoardSlot.tsx` | Name, HP, ATK, Melee/Ranged; green border = legal target; yellow bg = selected |
-| `src/ui/Hand.tsx` | Name, cost ⚡ (gold), type badge (color-coded), HP/ATK for units, tooltip for spells/upgrades |
+| `src/ui/BoardSlot.tsx` | Name, HP, ATK, Melee/Ranged, status badges (❄ FROZEN / ↓ WEAK ×N / ✦ OFFERING); green border = legal target |
+| `src/ui/Hand.tsx` | Name, cost ⚡ (gold), type badge (color-coded), HP/ATK for units |
 | `src/ui/HUD.tsx` | Energy/max, actions, deck count, companion name/HP/charge; gold border if active player |
 | `src/ui/EventLog.tsx` | Last 8 entries from `state.eventLog`; fixed 160px height, `overflowY: scroll` |
 
@@ -386,10 +324,15 @@ Bugs found and fixed during development. Do not re-introduce these.
 |---|---|
 | **Lane targeting — Melee** | Attacks only the enemy slot at the same lane index. If front is empty, can reach the back slot in that same lane (no cross-lane). |
 | **Lane targeting — Ranged** | Attacks own lane ± adjacent lanes (up to 3 lanes). For each lane, front slot is the primary target; back slot is reachable only if front is empty. |
-| **Companion as win condition** | Companion HP reaching 0 sets `winner` and `phase: 'ended'` immediately in `resolveAttack` or the Death Flare loop. No separate life total. |
+| **Companion as win condition** | Companion HP reaching 0 sets `winner` and `phase: 'ended'` immediately in `resolveAttack`. No separate life total. |
 | **Opening placement** | Each player places all 6 cards (companion + 5 deck cards) face-down into specific board slots. Reveal is simultaneous. Companion is the first card in the opening hand. |
 | **Action economy** | Playing, moving, and attacking each cost 1 action. Moving costs 0 Energy. Energy is only spent on card play. |
 | **Companion HP sync** | `dealDamage` always updates both `player.companion.currentHp` and the board slot occupant in the same reducer pass. |
+| **Recall terminology** | In-engine: `checkCompanionEvolution`, `evolutionStage`, `evolutionDefinitionId` (legacy names kept for compatibility). In design docs and UI: "Recall" is the correct term. |
+| **`companion.definitionId` never changes** | It always holds the base form ID (e.g., `'caelum-voss'`). Use `evolutionStage === 2` + `definitionId` together to detect Recalled state. Never check for the `-recalled` ID on `definitionId`. |
+| **Weakened stacks** | Applying Weakened immediately decrements `currentAttack` (floor 0) AND increments `weakenedStacks`. All existing attack math uses `currentAttack` unchanged. Compound Reading applies additional stacks at the start of Seravine's turn. Stacks are cleared when the unit dies (unit is removed from board). |
+| **Status effect clearing** | `frozen` and `markedAsOffering` clear at the start of the affected unit's **owner's** next turn, not the caster's. `clearActivePlayerStatuses` runs in `startTurn` before Charge and Recall checks. |
+| **Active ability costs** | All companion active abilities cost 1 action. `null-codex` additionally costs 1 Energy. No other ability costs Energy. Abilities are only available after Recall (`evolutionStage === 2`). |
 
 ---
 
@@ -397,8 +340,5 @@ Bugs found and fixed during development. Do not re-introduce these.
 
 **Phase 7 — Remaining work in priority order:**
 
-1. **Fix evolution board slot sync** — `checkCompanionEvolution` updates `player.companion` but not the board slot occupant. Add the same board-slot scan that `dealDamage` uses to apply the new stats to the slot.
-2. **Implement Pack Signal** — reposition a friendly unit to an empty adjacent slot (spell, cost 1)
-3. **Implement Pounce Window** — force an enemy front-row unit to move back, opening a lane (spell, cost 1)
-4. **Fix upgrade targeting highlights** — when an Upgrade card is selected, `getLegalPlaySlots` shows empty slots; should show occupied own-board slots instead
-5. **Implement Grave Lancer death bonus** — bonus trigger when a friendly unit dies while Grave Lancer is on the board
+1. **Add deck spells/upgrades** — each Remnant has 2 open card slots per REMNANTS.md
+2. **Implement Plumas de Quetzalcóatl** — Xochitl Recalled passive: on attack, grant 1 Charge to a friendly unit (requires mid-resolution targeting UI)
